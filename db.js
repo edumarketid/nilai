@@ -2,16 +2,21 @@
 const dbClient = window.supabase.createClient(APP_CONFIG.SERVER_URL, APP_CONFIG.SERVER_ANON_KEY);
 
 const DBService = {
-  // Baca semua tabel sumber (aman untuk aplikasi CBT & Absensi QR Code)
+  // Baca semua tabel sumber dengan limit 5000 baris & pelaporan error jelas
   async fetchAllSourceTables() {
     const [resSiswa, resGuru, resMapel, resAdmin, resUjian, resAbsensi] = await Promise.all([
-      dbClient.from('siswa').select('*'),
-      dbClient.from('guru').select('*'),
-      dbClient.from('mapel').select('*'),
-      dbClient.from('admin').select('*'),
-      dbClient.from('hasil_ujian').select('*'),
-      dbClient.from('absensi_harian').select('*')
+      dbClient.from('siswa').select('*').range(0, 4999),
+      dbClient.from('guru').select('*').range(0, 1999),
+      dbClient.from('mapel').select('*').range(0, 999),
+      dbClient.from('admin').select('*').range(0, 499),
+      dbClient.from('hasil_ujian').select('*').range(0, 9999),
+      dbClient.from('absensi_harian').select('*').range(0, 9999)
     ]);
+
+    const errors = [];
+    if (resSiswa.error) errors.push(`siswa: ${resSiswa.error.message}`);
+    if (resGuru.error) errors.push(`guru: ${resGuru.error.message}`);
+    if (resMapel.error) errors.push(`mapel: ${resMapel.error.message}`);
 
     return {
       siswa: resSiswa.data || [],
@@ -19,17 +24,18 @@ const DBService = {
       mapel: resMapel.data || [],
       admin: resAdmin.data || [],
       hasilUjian: resUjian.data || [],
-      absensiHarian: resAbsensi.data || []
+      absensiHarian: resAbsensi.data || [],
+      errors
     };
   },
 
   // Baca 4 tabel khusus penyimpanan E-Rapor
   async fetchAllRaporTables() {
     const [resRNilai, resRWalas, resRMapel, resRPelengkap] = await Promise.all([
-      dbClient.from('rapor_nilai').select('*'),
-      dbClient.from('rapor_wali_kelas').select('*'),
-      dbClient.from('rapor_setting_mapel').select('*'),
-      dbClient.from('rapor_pelengkap').select('*')
+      dbClient.from('rapor_nilai').select('*').range(0, 9999),
+      dbClient.from('rapor_wali_kelas').select('*').range(0, 999),
+      dbClient.from('rapor_setting_mapel').select('*').range(0, 999),
+      dbClient.from('rapor_pelengkap').select('*').range(0, 4999)
     ]);
 
     return {
