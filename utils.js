@@ -1,5 +1,24 @@
 // utils.js - Fungsi Bantu Normalisasi Data, Deteksi Fase & Perhitungan Nilai
 const Utils = {
+  // Helper fleksibel mengambil nilai properti tanpa peduli huruf besar/kecil
+  pickField(obj, candidates) {
+    if (!obj || typeof obj !== 'object') return '';
+    for (const key of candidates) {
+      if (obj[key] !== undefined && obj[key] !== null && String(obj[key]).trim() !== '') {
+        return String(obj[key]).trim();
+      }
+    }
+    const lowerMap = {};
+    Object.keys(obj).forEach(k => { lowerMap[k.toLowerCase()] = obj[k]; });
+    for (const key of candidates) {
+      const val = lowerMap[key.toLowerCase()];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        return String(val).trim();
+      }
+    }
+    return '';
+  },
+
   normalizePhone(hp) {
     if (!hp) return '';
     let s = String(hp).replace(/[^0-9]/g, '');
@@ -9,46 +28,47 @@ const Utils = {
   },
 
   getSiswaNama(s) {
-    return (s.nama_siswa || s.nama_lengkap || s.nama || s.full_name || s.student_name || '').trim();
+    return this.pickField(s, ['nama_siswa', 'NAMA_SISWA', 'nama_lengkap', 'NAMA_LENGKAP', 'nama', 'NAMA', 'full_name', 'student_name']);
   },
 
   getSiswaNISN(s) {
-    return String(s.nisn || s.NISN || s.nis || s.NIS || s.id || '').trim();
+    return this.pickField(s, ['nisn', 'NISN', 'nis', 'NIS', 'id', 'ID']);
   },
 
   getSiswaNIS(s) {
-    return String(s.nis || s.NIS || '').trim();
+    return this.pickField(s, ['nis', 'NIS', 'no_induk', 'NO_INDUK']);
   },
 
   getSiswaKelas(s) {
-    return String(s.kelas || s.rombel || s.kelas_siswa || '').trim();
+    return this.pickField(s, ['kelas', 'KELAS', 'rombel', 'ROMBEL', 'kelas_siswa', 'KELAS_SISWA', 'tingkat_kelas']);
   },
 
   getGuruNama(g) {
-    return String(g.nama_guru || g.nama || g.nama_lengkap || '').trim();
+    return this.pickField(g, ['nama_guru', 'NAMA_GURU', 'nama', 'NAMA', 'nama_lengkap', 'NAMA_LENGKAP']);
   },
 
   getGuruNIP(g) {
-    return String(g.nip || g.NIP || '-').trim() || '-';
+    return this.pickField(g, ['nip', 'NIP', 'nuptk', 'NUPTK']) || '-';
   },
 
   getGuruHP(g) {
-    return this.normalizePhone(g.no_hp || g.hp || g.telepon || g.whatsapp || g.username || '');
+    const raw = this.pickField(g, ['no_hp', 'NO_HP', 'hp', 'HP', 'telepon', 'TELEPON', 'no_wa', 'NO_WA', 'whatsapp', 'WHATSAPP', 'username', 'USERNAME']);
+    return this.normalizePhone(raw);
   },
 
   getGuruMapelArray(g) {
-    const raw = g.mapel || g.mata_pelajaran || g.mapel_diampu || '';
+    const raw = g.mapel ?? g.MAPEL ?? g.mata_pelajaran ?? g.MATA_PELAJARAN ?? g.mapel_diampu ?? g.MAPEL_DIAMPU ?? '';
     if (!raw) return [];
     if (Array.isArray(raw)) return raw.map(x => String(x).trim()).filter(Boolean);
     return String(raw).split(/[,;|/]+/).map(x => x.trim()).filter(Boolean);
   },
 
   getMapelKode(m) {
-    return String(m.kode_mapel || m.kode || m.id || m.nama_mapel || m.mapel || '').trim();
+    return this.pickField(m, ['kode_mapel', 'KODE_MAPEL', 'kode', 'KODE', 'id', 'ID', 'nama_mapel', 'NAMA_MAPEL', 'mapel', 'MAPEL']);
   },
 
   getMapelNama(m) {
-    return String(m.nama_mapel || m.mapel || m.nama || m.kode_mapel || '').trim();
+    return this.pickField(m, ['nama_mapel', 'NAMA_MAPEL', 'mapel', 'MAPEL', 'nama', 'NAMA', 'kode_mapel', 'KODE_MAPEL']);
   },
 
   deteksiFaseKelompok(kelasStr) {
