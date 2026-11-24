@@ -1,0 +1,182 @@
+/* style.css - Styling Aplikasi E-Rapor & Layout Cetak Kertas F4 (215mm x 330mm) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+/* ================= PERBAIKAN TABEL INPUT NILAI RESPONSIF SAAT TAMBAH TP ================= */
+.table-nilai-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  position: relative;
+  border-top: 1px solid #e2e8f0;
+}
+
+.table-nilai {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Sticky kolom No dan Nama Siswa agar tidak hilang saat scroll horizontal TP */
+.sticky-col-no {
+  position: sticky;
+  left: 0;
+  z-index: 15;
+  background-color: #f8fafc;
+  width: 42px;
+  min-width: 42px;
+  max-width: 42px;
+}
+
+.sticky-col-nama {
+  position: sticky;
+  left: 42px;
+  z-index: 15;
+  background-color: #ffffff;
+  width: 210px;
+  min-width: 210px;
+  max-width: 210px;
+  box-shadow: 2px 0 5px -2px rgba(15, 23, 42, 0.08);
+}
+
+thead .sticky-col-no,
+thead .sticky-col-nama {
+  background-color: #f1f5f9;
+  z-index: 20;
+}
+
+tbody tr:hover .sticky-col-nama,
+tbody tr:hover .sticky-col-no {
+  background-color: #f8fafc;
+}
+
+/* Kolom Capaian Kompetensi selalu lebar & terbaca penuh meski TP bertambah banyak */
+.col-capaian {
+  min-width: 320px;
+  width: 340px;
+}
+
+.textarea-capaian {
+  width: 100%;
+  min-width: 300px;
+  min-height: 58px;
+  resize: vertical;
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: 1.38;
+}
+
+/* ================= STYLING KHUSUS CETAK RAPOR KERTAS F4 (215mm x 330mm) ================= */
+.f4-page {
+  width: 215mm;
+  min-height: 330mm;
+  padding: 14mm 16mm 14mm 16mm;
+  margin: 0 auto 24px auto;
+  background: #ffffff;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12);
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 10.5pt;
+  line-height: 1.32;
+  color: #000000;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.rapor-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  margin-bottom: 10px;
+  font-size: 10pt;
+}
+
+.rapor-table th,
+.rapor-table td {
+  border: 1px solid #000000;
+  padding: 4.5px 6px;
+  vertical-align: top;
+}
+
+.rapor-table th {
+  background-color: #f3f4f6 !important;
+  font-weight: bold;
+  text-align: center;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.rapor-group-row td {
+  background-color: #f9fafb !important;
+  font-weight: bold;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.identitas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5pt;
+  margin-bottom: 8px;
+}
+
+.identitas-table td {
+  padding: 2px 3px;
+  vertical-align: top;
+}
+
+.page-footer {
+  border-top: 1px solid #9ca3af;
+  padding-top: 4px;
+  margin-top: 10px;
+  font-size: 9pt;
+  display: flex;
+  justify-content: space-between;
+  color: #374151;
+}
+
+@media print {
+  @page {
+    size: 215mm 330mm;
+    margin: 0;
+  }
+
+  body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  #printAreaContainer {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  .f4-page {
+    width: 215mm;
+    height: 330mm;
+    min-height: 330mm;
+    margin: 0 !important;
+    padding: 13mm 15mm 13mm 15mm;
+    box-shadow: none !important;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .f4-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+}
