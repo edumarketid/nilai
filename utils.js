@@ -40,7 +40,7 @@ const Utils = {
   },
 
   getSiswaKelas(s) {
-    return this.pickField(s, ['kelas', 'KELAS', 'rombel', 'ROMBEL', 'kelas_siswa', 'KELAS_SISWA', 'tingkat_kelas']);
+    return this.pickField(s, ['KELAS', 'kelas', 'ROMBEL', 'rombel', 'KELAS_SISWA', 'kelas_siswa']);
   },
 
   getGuruNama(g) {
