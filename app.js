@@ -9,11 +9,7 @@ const state = {
   absensiHarian: [],
   raporNilai: {},
   raporWaliKelas: {},
-  raporSettingMapel: {
-    FASE_E_X: [],
-    FASE_F_XI: [],
-    FASE_F_XII: []
-  },
+  raporSettingMapel: {}, // Key: nama kelas (misal "X TKJ", "X TKR") atau fallback fase_key
   raporPelengkap: {},
   jumlahTP: 3,
   kepalaSekolah: { nama: 'NUDDIN MAJIDO, S.Pd., M.Pd.', nip: '197712092005021005' }
@@ -32,7 +28,7 @@ async function syncAllFromServer(notify = false) {
     state.absensiHarian = src.absensiHarian;
 
     const kepsek = state.guru.find(g => {
-      const jab = String(g.jabatan || g.tugas_tambahan || g.role || '').toLowerCase();
+      const jab = String(g.jabatan || g.JABATAN || g.tugas_tambahan || g.role || '').toLowerCase();
       return jab.includes('kepala sekolah') || jab.includes('penanggung jawab');
     });
     if (kepsek) {
@@ -48,17 +44,16 @@ async function syncAllFromServer(notify = false) {
     });
 
     if (rData.raporSettingMapel.length > 0) {
-      state.raporSettingMapel = { FASE_E_X: [], FASE_F_XI: [], FASE_F_XII: [] };
+      state.raporSettingMapel = {};
       rData.raporSettingMapel
         .sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
         .forEach(row => {
-          if (state.raporSettingMapel[row.fase_key]) {
-            state.raporSettingMapel[row.fase_key].push(row);
-          }
+          const key = row.fase_key; // Menyimpan nama kelas (X TKJ, X TKR) atau fase lama
+          if (!state.raporSettingMapel[key]) state.raporSettingMapel[key] = [];
+          state.raporSettingMapel[key].push(row);
         });
-    } else {
-      initDefaultSettingMapel();
     }
+    initDefaultSettingMapelPerKelas();
 
     rData.raporPelengkap.forEach(row => {
       state.raporPelengkap[`${row.tahun_pelajaran}|${row.semester}|${row.kelas}|${row.nisn}`] = row;
@@ -66,10 +61,13 @@ async function syncAllFromServer(notify = false) {
 
     saveLocalCache();
     if (statusEl) {
-      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Terhubung ke Server (${state.siswa.length} siswa)`;
+      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Terhubung ke Server (${state.siswa.length} siswa, ${state.guru.length} guru)`;
     }
     if (notify) Utils.showToast('Data berhasil disinkronkan dari Server.');
-    if (state.user) refreshActiveView();
+    if (state.user) {
+      populateAllDropdowns();
+      refreshActiveView();
+    }
   } catch (err) {
     console.error(err);
     loadLocalCache();
@@ -98,16 +96,27 @@ function loadLocalCache() {
     const parsed = JSON.parse(raw);
     if (parsed.raporNilai) state.raporNilai = { ...parsed.raporNilai, ...state.raporNilai };
     if (parsed.raporWaliKelas) state.raporWaliKelas = { ...parsed.raporWaliKelas, ...state.raporWaliKelas };
-    if (parsed.raporSettingMapel) state.raporSettingMapel = parsed.raporSettingMapel;
+    if (parsed.raporSettingMapel) state.raporSettingMapel = { ...parsed.raporSettingMapel, ...state.raporSettingMapel };
     if (parsed.raporPelengkap) state.raporPelengkap = { ...parsed.raporPelengkap, ...state.raporPelengkap };
   } catch (e) {}
 }
 
-function initDefaultSettingMapel() {
-  const baseList = state.mapel.map((m, idx) => {
+function buildDefaultMapelArrayForKelas(kelas) {
+  const fk = Utils.deteksiFaseKelompok(kelas);
+  // Jika sudah ada setting lama berdasarkan fase (FASE_E_X / FASE_F_XI / FASE_F_XII), gunakan sebagai template awal
+  if (state.raporSettingMapel[fk] && state.raporSettingMapel[fk].length > 0) {
+    return JSON.parse(JSON.stringify(state.raporSettingMapel[fk])).map((m, i) => ({
+      ...m,
+      fase_key: kelas,
+      urutan: i + 1
+    }));
+  }
+
+  return state.mapel.map((m, idx) => {
     const nama = Utils.getMapelNama(m);
     const isUmum = /agama|pancasila|indonesia|jasmani|pjok|sejarah|muatan lokal|mulok|matematika|inggris|seni|informatika|ipas/i.test(nama);
     return {
+      fase_key: kelas,
       urutan: idx + 1,
       kelompok: isUmum ? 'A' : 'B',
       kode_mapel: Utils.getMapelKode(m),
@@ -115,9 +124,13 @@ function initDefaultSettingMapel() {
       aktif: true
     };
   });
-  ['FASE_E_X', 'FASE_F_XI', 'FASE_F_XII'].forEach(fk => {
-    if (!state.raporSettingMapel[fk] || state.raporSettingMapel[fk].length === 0) {
-      state.raporSettingMapel[fk] = JSON.parse(JSON.stringify(baseList));
+}
+
+function initDefaultSettingMapelPerKelas() {
+  const kelasList = getUniqueKelasList();
+  kelasList.forEach(kelas => {
+    if (!state.raporSettingMapel[kelas] || state.raporSettingMapel[kelas].length === 0) {
+      state.raporSettingMapel[kelas] = buildDefaultMapelArrayForKelas(kelas);
     }
   });
 }
@@ -159,8 +172,8 @@ function setupLoginHandlers() {
 
     if (role === 'ADMIN') {
       const foundAdmin = state.admin.find(a => {
-        const u = String(a.username || a.user || a.email || '').trim().toLowerCase();
-        const p = String(a.password || a.pass || a.sandi || '').trim();
+        const u = String(a.username || a.USERNAME || a.user || a.email || '').trim().toLowerCase();
+        const p = String(a.password || a.PASSWORD || a.pass || a.sandi || '').trim();
         return u === userRaw.toLowerCase() && p === passRaw;
       });
       if (!foundAdmin) {
@@ -170,7 +183,7 @@ function setupLoginHandlers() {
       }
       state.user = {
         role: 'ADMIN',
-        nama: foundAdmin.nama || foundAdmin.nama_admin || 'Admin Kurikulum',
+        nama: foundAdmin.nama || foundAdmin.NAMA || foundAdmin.nama_admin || 'Admin Kurikulum',
         nip: '-',
         no_hp: userRaw,
         mapelList: [],
@@ -185,7 +198,7 @@ function setupLoginHandlers() {
         return;
       }
 
-      const validPass = String(foundGuru.password || '123456').trim();
+      const validPass = String(foundGuru.password || foundGuru.PASSWORD || '123456').trim();
       if (passRaw !== validPass && passRaw !== '123456') {
         alertBox.textContent = 'Kata sandi salah. Gunakan sandi default 123456.';
         alertBox.classList.remove('hidden');
@@ -267,7 +280,7 @@ function buildNavigationByRole() {
   } else if (state.user.role === 'ADMIN') {
     tabs = [
       { id: 'admin-walas', label: '1. Penetapan Wali Kelas' },
-      { id: 'admin-mapel', label: '2. Susunan Mapel per Fase' },
+      { id: 'admin-mapel', label: '2. Susunan Mapel per Kelas' },
       { id: 'rekap', label: '3. Pantau Rekap Nilai' },
       { id: 'cetak', label: '4. Pratinjau Cetak Rapor F4' }
     ];
@@ -323,7 +336,9 @@ function getUniqueKelasList() {
 function populateAllDropdowns() {
   const kelasList = getUniqueKelasList();
   const selKelasNilai = document.getElementById('filterKelasNilai');
-  selKelasNilai.innerHTML = kelasList.map(k => `<option value="${k}">${k}</option>`).join('');
+  if (selKelasNilai) {
+    selKelasNilai.innerHTML = kelasList.map(k => `<option value="${k}">${k}</option>`).join('');
+  }
 
   const selMapelNilai = document.getElementById('filterMapelNilai');
   const badgesContainer = document.getElementById('mapelQuickBadges');
@@ -342,18 +357,22 @@ function populateAllDropdowns() {
     mapelOptions = state.mapel.map(m => ({ kode: Utils.getMapelKode(m), nama: Utils.getMapelNama(m) }));
   }
 
-  selMapelNilai.innerHTML = mapelOptions.map(m => `<option value="${m.kode}">${m.nama}</option>`).join('');
+  if (selMapelNilai) {
+    selMapelNilai.innerHTML = mapelOptions.map(m => `<option value="${m.kode}">${m.nama}</option>`).join('');
+  }
 
-  if (guruMapels.length > 0 && state.user?.role === 'GURU') {
-    badgesContainer.innerHTML = `<span class="text-[11px] text-slate-500 py-1">Mapel Anda:</span>` +
-      mapelOptions.map(m => `
-        <button type="button" onclick="pilihMapelCepat('${m.kode}')"
-          class="text-[11px] px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 font-semibold">
-          ★ ${m.nama}
-        </button>
-      `).join('');
-  } else {
-    badgesContainer.innerHTML = '';
+  if (badgesContainer) {
+    if (guruMapels.length > 0 && state.user?.role === 'GURU') {
+      badgesContainer.innerHTML = `<span class="text-[11px] text-slate-500 py-1">Mapel Anda:</span>` +
+        mapelOptions.map(m => `
+          <button type="button" onclick="pilihMapelCepat('${m.kode}')"
+            class="text-[11px] px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 font-semibold">
+            ★ ${m.nama}
+          </button>
+        `).join('');
+    } else {
+      badgesContainer.innerHTML = '';
+    }
   }
 
   const targetKelasWalas = (state.user?.role === 'WALI_KELAS' && state.user.kelasBinaan)
@@ -366,6 +385,14 @@ function populateAllDropdowns() {
     el.innerHTML = targetKelasWalas.map(k => `<option value="${k}">${k}</option>`).join('');
     el.disabled = (state.user?.role === 'WALI_KELAS');
   });
+
+  // Populate dropdown Kelas pada halaman Admin Susunan Mapel (dari tabel siswa kolom KELAS)
+  const selAdminKelasMapel = document.getElementById('adminKelasMapelSelect');
+  if (selAdminKelasMapel) {
+    const prevVal = selAdminKelasMapel.value;
+    selAdminKelasMapel.innerHTML = kelasList.map(k => `<option value="${k}">${k}</option>`).join('');
+    if (prevVal && kelasList.includes(prevVal)) selAdminKelasMapel.value = prevVal;
+  }
 
   const selAdminMapel = document.getElementById('adminTambahMapelSelect');
   if (selAdminMapel) {
@@ -413,15 +440,15 @@ function cariNilaiSASServer(siswa, kodeMapel, namaMapel) {
 
   const match = state.hasilUjian.find(h => {
     const hNisn = String(h.nisn || h.NISN || h.nis || h.NIS || '').trim().toLowerCase();
-    const hNama = String(h.nama_siswa || h.nama || '').trim().toLowerCase();
-    const hMapel = String(h.kode_mapel || h.mapel || h.nama_mapel || '').trim().toLowerCase();
+    const hNama = String(h.nama_siswa || h.NAMA_SISWA || h.nama || h.NAMA || '').trim().toLowerCase();
+    const hMapel = String(h.kode_mapel || h.KODE_MAPEL || h.mapel || h.MAPEL || h.nama_mapel || '').trim().toLowerCase();
     const siswaCocok = (nisn && hNisn === nisn) || (nis && hNisn === nis) || (namaS && hNama === namaS);
     const mapelCocok = hMapel === km || hMapel === nm || hMapel.includes(nm) || nm.includes(hMapel);
     return siswaCocok && mapelCocok;
   });
 
   if (!match) return '';
-  const skor = match.nilai ?? match.skor ?? match.nilai_akhir ?? match.hasil ?? '';
+  const skor = match.nilai ?? match.NILAI ?? match.skor ?? match.SKOR ?? match.nilai_akhir ?? match.hasil ?? '';
   return skor !== '' && !isNaN(Number(skor)) ? Number(skor) : '';
 }
 
@@ -625,9 +652,15 @@ async function simpanNilaiMapelKeServer() {
 
 // ================= TAB 2: REKAP NILAI WALI KELAS =================
 function getMapelSusunanByKelas(kelas) {
+  // 1. Cek pengaturan spesifik berdasarkan nama kelas (misal "X TKJ", "X TKR")
+  if (state.raporSettingMapel[kelas] && state.raporSettingMapel[kelas].length > 0) {
+    return state.raporSettingMapel[kelas].filter(m => m.aktif !== false);
+  }
+  // 2. Fallback ke pengaturan fase jika belum diset khusus per kelas
   const fk = Utils.deteksiFaseKelompok(kelas);
-  const list = state.raporSettingMapel[fk] || [];
-  if (list.length > 0) return list.filter(m => m.aktif !== false);
+  const listFase = state.raporSettingMapel[fk] || [];
+  if (listFase.length > 0) return listFase.filter(m => m.aktif !== false);
+
   return state.mapel.map((m, i) => ({
     urutan: i + 1,
     kelompok: 'A',
@@ -657,7 +690,7 @@ function renderRekapWaliKelas() {
   const walas = state.raporWaliKelas[`${tahun}|${kelas}`];
 
   document.getElementById('infoWaliKelasRekap').textContent = walas?.nama_wali_kelas || 'Belum ditetapkan Admin';
-  document.getElementById('infoFaseRekap').textContent = Utils.getLabelFase(Utils.deteksiFaseKelompok(kelas));
+  document.getElementById('infoFaseRekap').textContent = `${kelas} (${Utils.getLabelFase(Utils.deteksiFaseKelompok(kelas))})`;
 
   const mapelSusunan = getMapelSusunanByKelas(kelas);
   const siswaKelas = state.siswa
@@ -732,14 +765,19 @@ function exportLegerCSV() {
 
 // ================= TAB 3: DATA PELENGKAP RAPOR =================
 function onKelasPelengkapChange() {
-  const kelas = document.getElementById('filterKelasPelengkap').value;
+  const elKelas = document.getElementById('filterKelasPelengkap');
+  if (!elKelas) return;
+  const kelas = elKelas.value;
   const siswaKelas = state.siswa
     .filter(s => Utils.getSiswaKelas(s) === kelas)
     .sort((a, b) => Utils.getSiswaNama(a).localeCompare(Utils.getSiswaNama(b), 'id'));
 
-  document.getElementById('filterSiswaPelengkap').innerHTML = siswaKelas
-    .map(s => `<option value="${Utils.getSiswaNISN(s)}">${Utils.getSiswaNama(s)} (${Utils.getSiswaNISN(s)})</option>`)
-    .join('');
+  const elSiswa = document.getElementById('filterSiswaPelengkap');
+  if (elSiswa) {
+    elSiswa.innerHTML = siswaKelas
+      .map(s => `<option value="${Utils.getSiswaNISN(s)}">${Utils.getSiswaNama(s)} (${Utils.getSiswaNISN(s)})</option>`)
+      .join('');
+  }
   loadFormPelengkapSiswa();
 }
 
@@ -768,10 +806,10 @@ function hitungAbsensiDariServer(siswa) {
 }
 
 function loadFormPelengkapSiswa() {
-  const tahun = document.getElementById('globalTahun').value;
-  const semester = document.getElementById('globalSemester').value;
-  const kelas = document.getElementById('filterKelasPelengkap').value;
-  const nisn = document.getElementById('filterSiswaPelengkap').value;
+  const tahun = document.getElementById('globalTahun')?.value;
+  const semester = document.getElementById('globalSemester')?.value;
+  const kelas = document.getElementById('filterKelasPelengkap')?.value;
+  const nisn = document.getElementById('filterSiswaPelengkap')?.value;
   if (!nisn) return;
 
   const saved = state.raporPelengkap[`${tahun}|${semester}|${kelas}|${nisn}`];
@@ -904,14 +942,19 @@ async function simpanPelengkapKeServer() {
 
 // ================= TAB 4: PRATINJAU & CETAK RAPOR F4 =================
 function onKelasCetakChange() {
-  const kelas = document.getElementById('filterKelasCetak').value;
+  const elKelas = document.getElementById('filterKelasCetak');
+  if (!elKelas) return;
+  const kelas = elKelas.value;
   const siswaKelas = state.siswa
     .filter(s => Utils.getSiswaKelas(s) === kelas)
     .sort((a, b) => Utils.getSiswaNama(a).localeCompare(Utils.getSiswaNama(b), 'id'));
 
-  document.getElementById('filterSiswaCetak').innerHTML = siswaKelas
-    .map(s => `<option value="${Utils.getSiswaNISN(s)}">${Utils.getSiswaNama(s)} (${Utils.getSiswaNISN(s)})</option>`)
-    .join('');
+  const elSiswa = document.getElementById('filterSiswaCetak');
+  if (elSiswa) {
+    elSiswa.innerHTML = siswaKelas
+      .map(s => `<option value="${Utils.getSiswaNISN(s)}">${Utils.getSiswaNama(s)} (${Utils.getSiswaNISN(s)})</option>`)
+      .join('');
+  }
   renderPreviewRapor();
 }
 
@@ -942,9 +985,10 @@ function getPrintContextForSiswa(siswa) {
 }
 
 function renderPreviewRapor() {
-  const nisn = document.getElementById('filterSiswaCetak').value;
+  const nisn = document.getElementById('filterSiswaCetak')?.value;
   const siswa = state.siswa.find(s => Utils.getSiswaNISN(s) === nisn);
   const container = document.getElementById('printAreaContainer');
+  if (!container) return;
 
   if (!siswa) {
     container.innerHTML = `<div class="bg-white p-8 rounded-xl text-center text-slate-500">Pilih peserta didik untuk melihat pratinjau rapor F4.</div>`;
@@ -1052,14 +1096,28 @@ async function simpanWaliKelasKeServer() {
   }
 }
 
-// ================= TAB 6: ADMIN - SUSUNAN MAPEL PER FASE =================
+// ================= TAB 6: ADMIN - SUSUNAN MAPEL PER KELAS (X TKJ, X TKR, DLL) =================
 function renderAdminSettingMapel() {
-  const fk = document.getElementById('adminFaseSelect').value;
-  const list = state.raporSettingMapel[fk] || [];
+  const kelas = document.getElementById('adminKelasMapelSelect')?.value;
   const tbody = document.getElementById('tbodyAdminMapel');
+  if (!kelas) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-500">Data kelas dari tabel siswa belum tersedia.</td></tr>`;
+    return;
+  }
 
+  if (!state.raporSettingMapel[kelas] || state.raporSettingMapel[kelas].length === 0) {
+    state.raporSettingMapel[kelas] = buildDefaultMapelArrayForKelas(kelas);
+  }
+
+  const fk = Utils.deteksiFaseKelompok(kelas);
+  const judulEl = document.getElementById('judulSettingMapelKelas');
+  const badgeEl = document.getElementById('badgeFaseSettingMapel');
+  if (judulEl) judulEl.textContent = `Urutan & Pengelompokan Mata Pelajaran Rapor — Kelas ${kelas}`;
+  if (badgeEl) badgeEl.textContent = Utils.getLabelFase(fk);
+
+  const list = state.raporSettingMapel[kelas];
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-500">Belum ada mata pelajaran untuk fase ini.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-500">Belum ada mata pelajaran untuk kelas ${kelas}.</td></tr>`;
     return;
   }
 
@@ -1067,59 +1125,60 @@ function renderAdminSettingMapel() {
     <tr class="hover:bg-slate-50">
       <td class="p-2.5 text-center font-bold">${idx + 1}</td>
       <td class="p-2.5">
-        <select onchange="ubahKelompokMapelFase('${fk}', ${idx}, this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-full">
+        <select onchange="ubahKelompokMapelKelas('${kelas}', ${idx}, this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-full">
           <option value="A" ${item.kelompok === 'A' ? 'selected' : ''}>A. Kelompok Umum</option>
           <option value="B" ${item.kelompok === 'B' ? 'selected' : ''}>B. Kelompok Kejuruan</option>
         </select>
       </td>
       <td class="p-2.5 text-slate-500">${item.kode_mapel}</td>
       <td class="p-2.5">
-        <input type="text" value="${item.nama_mapel_cetak}" onchange="ubahNamaCetakMapelFase('${fk}', ${idx}, this.value)"
+        <input type="text" value="${item.nama_mapel_cetak}" onchange="ubahNamaCetakMapelKelas('${kelas}', ${idx}, this.value)"
           class="w-full border border-slate-300 rounded px-2.5 py-1 text-xs font-medium" />
       </td>
       <td class="p-2.5 text-center space-x-1">
-        <button type="button" onclick="geserUrutanMapel('${fk}', ${idx}, -1)" class="px-2 py-1 bg-slate-200 hover:bg-slate-300 rounded font-bold">↑</button>
-        <button type="button" onclick="geserUrutanMapel('${fk}', ${idx}, 1)" class="px-2 py-1 bg-slate-200 hover:bg-slate-300 rounded font-bold">↓</button>
-        <button type="button" onclick="hapusMapelDariFase('${fk}', ${idx})" class="px-2 py-1 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded font-bold">×</button>
+        <button type="button" onclick="geserUrutanMapel('${kelas}', ${idx}, -1)" class="px-2 py-1 bg-slate-200 hover:bg-slate-300 rounded font-bold">↑</button>
+        <button type="button" onclick="geserUrutanMapel('${kelas}', ${idx}, 1)" class="px-2 py-1 bg-slate-200 hover:bg-slate-300 rounded font-bold">↓</button>
+        <button type="button" onclick="hapusMapelDariKelas('${kelas}', ${idx})" class="px-2 py-1 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded font-bold">×</button>
       </td>
     </tr>
   `).join('');
 }
 
-function tambahMapelKeFase() {
-  const fk = document.getElementById('adminFaseSelect').value;
+function tambahMapelKeKelas() {
+  const kelas = document.getElementById('adminKelasMapelSelect').value;
+  if (!kelas) return;
   const sel = document.getElementById('adminTambahMapelSelect');
   const kode = sel.value;
   const nama = sel.options[sel.selectedIndex]?.text || kode;
 
-  const list = state.raporSettingMapel[fk] || [];
+  const list = state.raporSettingMapel[kelas] || [];
   if (list.some(x => x.kode_mapel === kode)) {
-    Utils.showToast('Mata pelajaran tersebut sudah ada dalam daftar fase ini.', true);
+    Utils.showToast(`Mata pelajaran tersebut sudah ada di kelas ${kelas}.`, true);
     return;
   }
 
   list.push({
-    fase_key: fk,
+    fase_key: kelas,
     urutan: list.length + 1,
     kelompok: 'A',
     kode_mapel: kode,
     nama_mapel_cetak: nama,
     aktif: true
   });
-  state.raporSettingMapel[fk] = list;
+  state.raporSettingMapel[kelas] = list;
   renderAdminSettingMapel();
 }
 
-function ubahKelompokMapelFase(fk, idx, val) {
-  state.raporSettingMapel[fk][idx].kelompok = val;
+function ubahKelompokMapelKelas(kelas, idx, val) {
+  state.raporSettingMapel[kelas][idx].kelompok = val;
 }
 
-function ubahNamaCetakMapelFase(fk, idx, val) {
-  state.raporSettingMapel[fk][idx].nama_mapel_cetak = val.trim();
+function ubahNamaCetakMapelKelas(kelas, idx, val) {
+  state.raporSettingMapel[kelas][idx].nama_mapel_cetak = val.trim();
 }
 
-function geserUrutanMapel(fk, idx, arah) {
-  const list = state.raporSettingMapel[fk];
+function geserUrutanMapel(kelas, idx, arah) {
+  const list = state.raporSettingMapel[kelas];
   const target = idx + arah;
   if (target < 0 || target >= list.length) return;
   const temp = list[idx];
@@ -1129,17 +1188,41 @@ function geserUrutanMapel(fk, idx, arah) {
   renderAdminSettingMapel();
 }
 
-function hapusMapelDariFase(fk, idx) {
-  state.raporSettingMapel[fk].splice(idx, 1);
-  state.raporSettingMapel[fk].forEach((item, i) => item.urutan = i + 1);
+function hapusMapelDariKelas(kelas, idx) {
+  state.raporSettingMapel[kelas].splice(idx, 1);
+  state.raporSettingMapel[kelas].forEach((item, i) => item.urutan = i + 1);
   renderAdminSettingMapel();
 }
 
+function salinMapelKeKelasLain() {
+  const sumberKelas = document.getElementById('adminKelasMapelSelect').value;
+  if (!sumberKelas) return;
+  const kelasList = getUniqueKelasList().filter(k => k !== sumberKelas);
+  if (kelasList.length === 0) return;
+
+  const tujuan = prompt(`Salin susunan mapel dari ${sumberKelas} ke kelas mana?\nPilihan kelas tersedia:\n${kelasList.join(', ')}`);
+  if (!tujuan) return;
+  const targetKelas = kelasList.find(k => k.toLowerCase() === tujuan.trim().toLowerCase());
+  if (!targetKelas) {
+    Utils.showToast('Nama kelas tujuan tidak ditemukan di daftar kelas.', true);
+    return;
+  }
+
+  state.raporSettingMapel[targetKelas] = JSON.parse(JSON.stringify(state.raporSettingMapel[sumberKelas])).map((m, idx) => ({
+    ...m,
+    fase_key: targetKelas,
+    urutan: idx + 1
+  }));
+  saveLocalCache();
+  Utils.showToast(`Susunan mapel ${sumberKelas} disalin ke ${targetKelas}. Jangan lupa simpan ${targetKelas}.`);
+}
+
 async function simpanSettingMapelKeServer() {
-  const fk = document.getElementById('adminFaseSelect').value;
-  const list = state.raporSettingMapel[fk] || [];
+  const kelas = document.getElementById('adminKelasMapelSelect').value;
+  if (!kelas) return;
+  const list = state.raporSettingMapel[kelas] || [];
   const payload = list.map((item, idx) => ({
-    fase_key: fk,
+    fase_key: kelas,
     urutan: idx + 1,
     kelompok: item.kelompok,
     kode_mapel: item.kode_mapel,
@@ -1150,11 +1233,11 @@ async function simpanSettingMapelKeServer() {
   saveLocalCache();
 
   try {
-    const { error } = await DBService.replaceSettingMapel(fk, payload);
+    const { error } = await DBService.replaceSettingMapel(kelas, payload);
     if (error) throw error;
-    Utils.showToast(`Susunan mapel ${Utils.getLabelFase(fk)} berhasil disimpan ke Server.`);
+    Utils.showToast(`Susunan mapel kelas ${kelas} berhasil disimpan ke Server.`);
   } catch (err) {
-    Utils.showToast('Susunan mapel tersimpan di cache lokal.', true);
+    Utils.showToast(`Susunan mapel kelas ${kelas} tersimpan di cache lokal.`, true);
   }
 }
 
