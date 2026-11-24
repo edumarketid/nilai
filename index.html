@@ -333,37 +333,42 @@
       </section>
 
       <!-- ==================== TAB 6: ADMIN - SUSUNAN MAPEL PER FASE ==================== -->
+      <!-- ==================== TAB 6: ADMIN - SUSUNAN MAPEL PER KELAS ==================== -->
       <section id="tab-admin-mapel" class="tab-panel hidden space-y-4">
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-wrap items-end justify-between gap-4">
           <div class="flex flex-wrap items-end gap-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Pilih Kelompok Fase Rapor</label>
-              <select id="adminFaseSelect" onchange="renderAdminSettingMapel()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold bg-white">
-                <option value="FASE_E_X">Fase E (Kelas X)</option>
-                <option value="FASE_F_XI">Fase F (Kelas XI)</option>
-                <option value="FASE_F_XII">Fase F (Kelas XII)</option>
-              </select>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Pilih Kelas / Rombel (Tabel Siswa)</label>
+              <select id="adminKelasMapelSelect" onchange="renderAdminSettingMapel()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold bg-white min-w-[180px]"></select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Tambah Mata Pelajaran dari Server</label>
               <div class="flex gap-2">
                 <select id="adminTambahMapelSelect" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-w-[220px]"></select>
-                <button onclick="tambahMapelKeFase()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg">
+                <button onclick="tambahMapelKeKelas()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg">
                   + Tambah
                 </button>
               </div>
             </div>
           </div>
 
-          <button onclick="simpanSettingMapelKeServer()" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded-lg shadow">
-            Simpan Susunan Mapel Fase Ini
-          </button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="salinMapelKeKelasLain()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300">
+              Salin ke Kelas Lain
+            </button>
+            <button onclick="simpanSettingMapelKeServer()" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded-lg shadow">
+              Simpan Susunan Mapel Kelas Ini
+            </button>
+          </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="p-3.5 bg-slate-50 border-b border-slate-200">
-            <h2 class="font-bold text-sm text-slate-800">Urutan &amp; Pengelompokan Mata Pelajaran Hasil Cetak Rapor</h2>
-            <p class="text-xs text-slate-500">Atur urutan tampil, kategori kelompok (A. Umum / B. Kejuruan), serta nama mata pelajaran yang dicetak pada rapor.</p>
+          <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="font-bold text-sm text-slate-800" id="judulSettingMapelKelas">Urutan &amp; Pengelompokan Mata Pelajaran Hasil Cetak Rapor</h2>
+              <p class="text-xs text-slate-500">Atur urutan tampil, kategori kelompok (A. Umum / B. Kejuruan), serta nama mata pelajaran yang dicetak pada rapor sesuai kelas masing-masing.</p>
+            </div>
+            <span id="badgeFaseSettingMapel" class="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800">Fase -</span>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-xs border-collapse">
