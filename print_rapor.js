@@ -30,7 +30,7 @@ const RaporPrinter = {
         <tr>
           <td>Alamat</td>
           <td>: ${alamatSekolah}</td>
-          <td>Tahun Pelajaran</td>
+          <td>Tahun Ajaran</td>
           <td>: ${tahun}</td>
         </tr>
       </table>
