@@ -1,4 +1,4 @@
-// app.js - Logika Utama Aplikasi E-Rapor Kurikulum Merdeka SMKN 1 Wakatobi
+// app.js - Logika Utama Aplikasi E-Nilai / E-Rapor Kurikulum Merdeka SMKN 1 Wakatobi
 const state = {
   user: null,
   siswa: [],
@@ -22,6 +22,9 @@ function bersihkanNamaMapel(nama) {
 // ================= SINKRONISASI & CACHE LOKAL =================
 async function syncAllFromServer(notify = false) {
   const statusEl = document.getElementById('serverConnStatus');
+  if (statusEl) {
+    statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Menghubungkan ke Server...`;
+  }
   try {
     const src = await DBService.fetchAllSourceTables();
     state.siswa = src.siswa.filter(s => Utils.getSiswaNama(s));
@@ -78,12 +81,13 @@ async function syncAllFromServer(notify = false) {
       refreshActiveView();
     }
   } catch (err) {
-    console.error(err);
+    console.error('Detail error sinkronisasi:', err);
     loadLocalCache();
+    const errMsg = err?.message || 'Gagal memuat data server';
     if (statusEl) {
-      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span> Mode Offline (Cache Lokal)`;
+      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span> Offline: ${errMsg}`;
     }
-    if (notify) Utils.showToast('Menggunakan data cache lokal.', true);
+    if (notify) Utils.showToast(`Offline: ${errMsg}`, true);
   }
 }
 
