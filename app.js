@@ -8,6 +8,7 @@ const state = {
   hasilUjian: [],
   absensiHarian: [],
   raporNilai: {},
+  raporNilaiList: [],
   raporWaliKelas: {},
   raporSettingMapel: {},
   raporPelengkap: {},
@@ -17,6 +18,14 @@ const state = {
 
 function bersihkanNamaMapel(nama) {
   return String(nama || '').replace(/\s*\([^)]*\)\s*$/g, '').trim() || String(nama || '').trim();
+}
+
+function normStr(val) {
+  return String(val || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function normNISN(val) {
+  return String(val || '').trim().replace(/^0+/, '').toLowerCase();
 }
 
 // ================= SINKRONISASI & CACHE LOKAL =================
@@ -44,7 +53,8 @@ async function syncAllFromServer(notify = false) {
 
     const rData = await DBService.fetchAllRaporTables();
     state.raporNilai = {};
-    rData.raporNilai.forEach(row => {
+    state.raporNilaiList = rData.raporNilai || [];
+    state.raporNilaiList.forEach(row => {
       const key = `${String(row.tahun_pelajaran || '').trim()}|${String(row.semester || '').trim()}|${String(row.kelas || '').trim()}|${String(row.nisn || '').trim()}|${String(row.kode_mapel || '').trim()}`;
       state.raporNilai[key] = row;
     });
@@ -73,9 +83,9 @@ async function syncAllFromServer(notify = false) {
 
     saveLocalCache();
     if (statusEl) {
-      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Terhubung ke Server (${state.siswa.length} siswa, ${state.guru.length} guru)`;
+      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Terhubung (${state.siswa.length} siswa, ${state.raporNilaiList.length} data nilai)`;
     }
-    if (notify) Utils.showToast('Data berhasil disinkronkan dari Server.');
+    if (notify) Utils.showToast(`Tersinkron: ${state.siswa.length} siswa & ${state.raporNilaiList.length} baris nilai dari Server.`);
     if (state.user) {
       populateAllDropdowns();
       refreshActiveView();
@@ -107,7 +117,10 @@ function loadLocalCache() {
     const raw = localStorage.getItem(APP_CONFIG.CACHE_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw);
-    if (parsed.raporNilai) state.raporNilai = { ...parsed.raporNilai, ...state.raporNilai };
+    if (parsed.raporNilai) {
+      state.raporNilai = { ...parsed.raporNilai, ...state.raporNilai };
+      state.raporNilaiList = Object.values(state.raporNilai);
+    }
     if (parsed.raporWaliKelas) state.raporWaliKelas = { ...parsed.raporWaliKelas, ...state.raporWaliKelas };
     if (parsed.raporSettingMapel) state.raporSettingMapel = { ...parsed.raporSettingMapel, ...state.raporSettingMapel };
     if (parsed.raporPelengkap) state.raporPelengkap = { ...parsed.raporPelengkap, ...state.raporPelengkap };
@@ -149,12 +162,12 @@ function initDefaultSettingMapelPerKelas() {
 }
 
 function getFilteredMapelForKelas(kelas) {
-  const allKelasLower = getUniqueKelasList().map(k => k.toLowerCase());
-  const targetLower = String(kelas || '').toLowerCase().trim();
+  const allKelasLower = getUniqueKelasList().map(k => normStr(k));
+  const targetLower = normStr(kelas);
 
   const filtered = state.mapel.filter(m => {
-    const nama = Utils.getMapelNama(m).toLowerCase();
-    const mapelKelasKolom = String(m.kelas || m.KELAS || '').toLowerCase().trim();
+    const nama = normStr(Utils.getMapelNama(m));
+    const mapelKelasKolom = normStr(m.kelas || m.KELAS || '');
     if (mapelKelasKolom) return mapelKelasKolom === targetLower;
 
     const matchedKelasInName = allKelasLower.find(k => nama.includes(`(${k})`) || nama.endsWith(` ${k}`));
@@ -241,7 +254,7 @@ function setupLoginHandlers() {
         const tahun = document.getElementById('globalTahun').value;
         const walasEntries = Object.values(state.raporWaliKelas).filter(w =>
           w.tahun_pelajaran === tahun &&
-          (Utils.normalizePhone(w.no_hp_wali_kelas) === hpInput || String(w.nama_wali_kelas).toLowerCase() === Utils.getGuruNama(foundGuru).toLowerCase())
+          (Utils.normalizePhone(w.no_hp_wali_kelas) === hpInput || normStr(w.nama_wali_kelas) === normStr(Utils.getGuruNama(foundGuru)))
         );
 
         if (walasEntries.length === 0) {
@@ -359,7 +372,7 @@ function refreshActiveView(activeTabId) {
 function getUniqueKelasList() {
   const set = new Set();
   state.siswa.forEach(s => {
-    const k = Utils.getSiswaKelas(s);
+    const k = String(Utils.getSiswaKelas(s) || '').trim();
     if (k) set.add(k);
   });
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'id'));
@@ -378,11 +391,11 @@ function updateDropdownMapelUntukKelas(kelasAktif) {
   let mapelOptions = [];
   if (state.user?.role === 'GURU' && guruMapels.length > 0) {
     guruMapels.forEach(gm => {
-      const gmBersih = bersihkanNamaMapel(gm).toLowerCase();
+      const gmBersih = normStr(bersihkanNamaMapel(gm));
       const match = mapelSesuaiKelas.find(m =>
-        bersihkanNamaMapel(Utils.getMapelNama(m)).toLowerCase() === gmBersih ||
-        Utils.getMapelNama(m).toLowerCase() === gm.toLowerCase() ||
-        Utils.getMapelKode(m).toLowerCase() === gm.toLowerCase()
+        normStr(bersihkanNamaMapel(Utils.getMapelNama(m))) === gmBersih ||
+        normStr(Utils.getMapelNama(m)) === normStr(gm) ||
+        normStr(Utils.getMapelKode(m)) === normStr(gm)
       );
       if (match) {
         mapelOptions.push({ kode: Utils.getMapelKode(match), nama: bersihkanNamaMapel(Utils.getMapelNama(match)) });
@@ -399,7 +412,7 @@ function updateDropdownMapelUntukKelas(kelasAktif) {
 
   const seen = new Set();
   mapelOptions = mapelOptions.filter(item => {
-    const k = item.nama.toLowerCase();
+    const k = normStr(item.nama);
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
@@ -508,16 +521,16 @@ function hapusKolomTP() {
 }
 
 function cariNilaiSASServer(siswa, kodeMapel, namaMapel) {
-  const nisn = Utils.getSiswaNISN(siswa).toLowerCase();
-  const nis = Utils.getSiswaNIS(siswa).toLowerCase();
-  const namaS = Utils.getSiswaNama(siswa).toLowerCase();
-  const km = kodeMapel.toLowerCase();
-  const nm = bersihkanNamaMapel(namaMapel).toLowerCase();
+  const nisn = normNISN(Utils.getSiswaNISN(siswa));
+  const nis = normNISN(Utils.getSiswaNIS(siswa));
+  const namaS = normStr(Utils.getSiswaNama(siswa));
+  const km = normStr(kodeMapel);
+  const nm = normStr(bersihkanNamaMapel(namaMapel));
 
   const match = state.hasilUjian.find(h => {
-    const hNisn = String(h.nisn || h.NISN || h.nis || h.NIS || '').trim().toLowerCase();
-    const hNama = String(h.nama_siswa || h.NAMA_SISWA || h.nama || h.NAMA || '').trim().toLowerCase();
-    const hMapel = bersihkanNamaMapel(String(h.kode_mapel || h.KODE_MAPEL || h.mapel || h.MAPEL || h.nama_mapel || '')).toLowerCase();
+    const hNisn = normNISN(h.nisn || h.NISN || h.nis || h.NIS || '');
+    const hNama = normStr(h.nama_siswa || h.NAMA_SISWA || h.nama || h.NAMA || '');
+    const hMapel = normStr(bersihkanNamaMapel(h.kode_mapel || h.KODE_MAPEL || h.mapel || h.MAPEL || h.nama_mapel || ''));
     const siswaCocok = (nisn && hNisn === nisn) || (nis && hNisn === nis) || (namaS && hNama === namaS);
     const mapelCocok = hMapel === km || hMapel === nm || hMapel.includes(nm) || nm.includes(hMapel);
     return siswaCocok && mapelCocok;
@@ -543,11 +556,11 @@ function renderTabelNilai() {
   document.getElementById('judulTabelNilai').textContent = `Pengolahan Nilai: ${namaMapel} — Kelas ${kelas || '-'}`;
 
   const siswaKelas = state.siswa
-    .filter(s => Utils.getSiswaKelas(s) === kelas)
+    .filter(s => normStr(Utils.getSiswaKelas(s)) === normStr(kelas))
     .sort((a, b) => Utils.getSiswaNama(a).localeCompare(Utils.getSiswaNama(b), 'id'));
 
   siswaKelas.forEach(s => {
-    const saved = cariNilaiSiswaUntukMapel(tahun, semester, kelas, Utils.getSiswaNISN(s), kodeMapel, namaMapel);
+    const saved = cariNilaiSiswaUntukMapel(tahun, semester, kelas, Utils.getSiswaNISN(s), kodeMapel, namaMapel, Utils.getSiswaNama(s));
     if (saved && Array.isArray(saved.nilai_sumatif) && saved.nilai_sumatif.length > state.jumlahTP) {
       state.jumlahTP = saved.nilai_sumatif.length;
     }
@@ -579,7 +592,7 @@ function renderTabelNilai() {
   tbody.innerHTML = siswaKelas.map((s, idx) => {
     const nisn = Utils.getSiswaNISN(s);
     const nama = Utils.getSiswaNama(s);
-    const saved = cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, kodeMapel, namaMapel) || {};
+    const saved = cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, kodeMapel, namaMapel, nama) || {};
     const tpArr = Array.isArray(saved.nilai_sumatif) ? saved.nilai_sumatif : [];
 
     let sasVal = (saved.nilai_sas !== undefined && saved.nilai_sas !== null && saved.nilai_sas !== '')
@@ -659,7 +672,7 @@ async function tarikNilaiSASDariServer() {
   const kodeMapel = selMapel.value;
   const namaMapel = bersihkanNamaMapel(selMapel.options[selMapel.selectedIndex]?.text || kodeMapel);
 
-  const siswaKelas = state.siswa.filter(s => Utils.getSiswaKelas(s) === kelas);
+  const siswaKelas = state.siswa.filter(s => normStr(Utils.getSiswaKelas(s)) === normStr(kelas));
   let terisi = 0;
 
   siswaKelas.forEach(s => {
@@ -733,6 +746,7 @@ async function simpanNilaiMapelKeServer() {
     payload.push(record);
   });
 
+  state.raporNilaiList = Object.values(state.raporNilai);
   saveLocalCache();
 
   try {
@@ -747,48 +761,89 @@ async function simpanNilaiMapelKeServer() {
 
 // ================= TAB 2: REKAP NILAI WALI KELAS & ADMIN =================
 function getMapelSusunanByKelas(kelas) {
+  let dasar = [];
   if (state.raporSettingMapel[kelas] && state.raporSettingMapel[kelas].length > 0) {
-    return state.raporSettingMapel[kelas].filter(m => m.aktif !== false);
+    dasar = state.raporSettingMapel[kelas].filter(m => m.aktif !== false);
+  } else {
+    const fk = Utils.deteksiFaseKelompok(kelas);
+    const listFase = state.raporSettingMapel[fk] || [];
+    if (listFase.length > 0) {
+      dasar = listFase.filter(m => m.aktif !== false);
+    } else {
+      dasar = getFilteredMapelForKelas(kelas).map((m, i) => ({
+        urutan: i + 1,
+        kelompok: 'A',
+        kode_mapel: Utils.getMapelKode(m),
+        nama_mapel_cetak: bersihkanNamaMapel(Utils.getMapelNama(m)),
+        aktif: true
+      }));
+    }
   }
-  const fk = Utils.deteksiFaseKelompok(kelas);
-  const listFase = state.raporSettingMapel[fk] || [];
-  if (listFase.length > 0) return listFase.filter(m => m.aktif !== false);
 
-  return getFilteredMapelForKelas(kelas).map((m, i) => ({
-    urutan: i + 1,
-    kelompok: 'A',
-    kode_mapel: Utils.getMapelKode(m),
-    nama_mapel_cetak: bersihkanNamaMapel(Utils.getMapelNama(m)),
-    aktif: true
-  }));
+  // Gabungkan otomatis mapel yang sudah ada nilainya di server untuk kelas ini meskipun belum ditambahkan Admin ke setting
+  const hasil = [...dasar];
+  const kelasNorm = normStr(kelas);
+  const existingNames = new Set(hasil.map(m => normStr(bersihkanNamaMapel(m.nama_mapel_cetak))));
+  const existingCodes = new Set(hasil.map(m => normStr(m.kode_mapel)));
+
+  state.raporNilaiList.forEach(row => {
+    if (normStr(row.kelas) !== kelasNorm) return;
+    if (!(row.nilai_akhir_bulat > 0)) return;
+    const namaBersih = bersihkanNamaMapel(row.nama_mapel || row.kode_mapel);
+    const namaNorm = normStr(namaBersih);
+    const kodeNorm = normStr(row.kode_mapel);
+
+    if (!existingNames.has(namaNorm) && !existingCodes.has(kodeNorm)) {
+      existingNames.add(namaNorm);
+      existingCodes.add(kodeNorm);
+      hasil.push({
+        urutan: hasil.length + 1,
+        kelompok: 'B',
+        kode_mapel: row.kode_mapel,
+        nama_mapel_cetak: namaBersih,
+        aktif: true
+      });
+    }
+  });
+
+  return hasil;
 }
 
-function cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, kodeMapel, namaMapel) {
-  const tahunClean = String(tahun || '').trim();
-  const semClean = String(semester || '').trim();
-  const kelasClean = String(kelas || '').trim();
-  const nisnClean = String(nisn || '').trim();
+function cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, kodeMapel, namaMapel, namaSiswa = '') {
+  const tahunClean = normStr(tahun);
+  const semClean = normStr(semester);
+  const kelasClean = normStr(kelas);
+  const nisnClean = normNISN(nisn);
+  const siswaClean = normStr(namaSiswa);
+  const kodeClean = normStr(kodeMapel);
+  const targetNamaBersih = normStr(bersihkanNamaMapel(namaMapel));
 
-  // 1. Cek kecocokan persis berdasarkan kode_mapel
-  const exact = state.raporNilai[`${tahunClean}|${semClean}|${kelasClean}|${nisnClean}|${kodeMapel}`];
-  if (exact) return exact;
+  const candidates = state.raporNilaiList.filter(item => {
+    const tOk = !tahunClean || normStr(item.tahun_pelajaran) === tahunClean;
+    const sOk = !semClean || normStr(item.semester) === semClean;
+    const kOk = normStr(item.kelas) === kelasClean;
+    if (!tOk || !sOk || !kOk) return false;
 
-  // 2. Cari di antara semua nilai siswa pada tahun, semester, dan kelas yang sama
-  const targetNamaBersih = bersihkanNamaMapel(namaMapel).toLowerCase();
-  const prefix = `${tahunClean}|${semClean}|${kelasClean}|${nisnClean}|`;
+    const itemNisn = normNISN(item.nisn);
+    const itemNama = normStr(item.nama_siswa);
+    return (nisnClean && itemNisn === nisnClean) || (siswaClean && itemNama === siswaClean);
+  });
 
-  const candidates = Object.keys(state.raporNilai)
-    .filter(k => k.startsWith(prefix))
-    .map(k => state.raporNilai[k]);
+  if (candidates.length === 0) return null;
 
-  const byName = candidates.find(item => {
-    const itemNama = bersihkanNamaMapel(item.nama_mapel || '').toLowerCase();
-    return itemNama === targetNamaBersih ||
-      (targetNamaBersih.length >= 6 && itemNama.includes(targetNamaBersih)) ||
+  const exactCode = candidates.find(item => normStr(item.kode_mapel) === kodeClean);
+  if (exactCode) return exactCode;
+
+  const exactName = candidates.find(item => normStr(bersihkanNamaMapel(item.nama_mapel)) === targetNamaBersih);
+  if (exactName) return exactName;
+
+  const partialName = candidates.find(item => {
+    const itemNama = normStr(bersihkanNamaMapel(item.nama_mapel));
+    return (targetNamaBersih.length >= 6 && itemNama.includes(targetNamaBersih)) ||
       (itemNama.length >= 6 && targetNamaBersih.includes(itemNama));
   });
 
-  return byName || null;
+  return partialName || null;
 }
 
 async function tarikUlangRekapDariServer() {
@@ -810,7 +865,7 @@ function renderRekapWaliKelas() {
 
   const mapelSusunan = getMapelSusunanByKelas(kelas);
   const siswaKelas = state.siswa
-    .filter(s => Utils.getSiswaKelas(s) === kelas)
+    .filter(s => normStr(Utils.getSiswaKelas(s)) === normStr(kelas))
     .sort((a, b) => Utils.getSiswaNama(a).localeCompare(Utils.getSiswaNama(b), 'id'));
 
   document.getElementById('theadRekap').innerHTML = `
@@ -828,11 +883,12 @@ function renderRekapWaliKelas() {
 
   document.getElementById('tbodyRekap').innerHTML = siswaKelas.map((s, idx) => {
     const nisn = Utils.getSiswaNISN(s);
+    const namaSiswa = Utils.getSiswaNama(s);
     let sum = 0;
     let count = 0;
 
     const cells = mapelSusunan.map(m => {
-      const nObj = cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, m.kode_mapel, m.nama_mapel_cetak);
+      const nObj = cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, m.kode_mapel, m.nama_mapel_cetak, namaSiswa);
       const val = nObj?.nilai_akhir_bulat || 0;
       if (val > 0) {
         sum += val;
@@ -845,7 +901,7 @@ function renderRekapWaliKelas() {
     return `
       <tr class="hover:bg-slate-50">
         <td class="p-2 text-center border-r border-slate-200">${idx + 1}</td>
-        <td class="p-2 border-r border-slate-200 font-semibold text-slate-800">${Utils.getSiswaNama(s)}</td>
+        <td class="p-2 border-r border-slate-200 font-semibold text-slate-800">${namaSiswa}</td>
         ${cells}
         <td class="p-2 text-center bg-blue-50/50 font-bold text-blue-900">${avg}</td>
       </tr>
@@ -858,18 +914,19 @@ function exportLegerCSV() {
   const semester = document.getElementById('globalSemester').value;
   const kelas = document.getElementById('filterKelasRekap').value;
   const mapelSusunan = getMapelSusunanByKelas(kelas);
-  const siswaKelas = state.siswa.filter(s => Utils.getSiswaKelas(s) === kelas);
+  const siswaKelas = state.siswa.filter(s => normStr(Utils.getSiswaKelas(s)) === normStr(kelas));
 
   const headers = ['No', 'NISN', 'Nama Siswa', ...mapelSusunan.map(m => m.nama_mapel_cetak)];
   const lines = [headers.join(';')];
 
   siswaKelas.forEach((s, idx) => {
     const nisn = Utils.getSiswaNISN(s);
+    const namaSiswa = Utils.getSiswaNama(s);
     const vals = mapelSusunan.map(m => {
-      const nObj = cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, m.kode_mapel, m.nama_mapel_cetak);
+      const nObj = cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, m.kode_mapel, m.nama_mapel_cetak, namaSiswa);
       return nObj?.nilai_akhir_bulat || '';
     });
-    lines.push([idx + 1, nisn, `"${Utils.getSiswaNama(s)}"`, ...vals].join(';'));
+    lines.push([idx + 1, nisn, `"${namaSiswa}"`, ...vals].join(';'));
   });
 
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -885,7 +942,7 @@ function onKelasPelengkapChange() {
   if (!elKelas) return;
   const kelas = elKelas.value;
   const siswaKelas = state.siswa
-    .filter(s => Utils.getSiswaKelas(s) === kelas)
+    .filter(s => normStr(Utils.getSiswaKelas(s)) === normStr(kelas))
     .sort((a, b) => Utils.getSiswaNama(a).localeCompare(Utils.getSiswaNama(b), 'id'));
 
   const elSiswa = document.getElementById('filterSiswaPelengkap');
@@ -898,19 +955,19 @@ function onKelasPelengkapChange() {
 }
 
 function hitungAbsensiDariServer(siswa) {
-  const nisn = Utils.getSiswaNISN(siswa).toLowerCase();
-  const nis = Utils.getSiswaNIS(siswa).toLowerCase();
-  const namaS = Utils.getSiswaNama(siswa).toLowerCase();
+  const nisn = normNISN(Utils.getSiswaNISN(siswa));
+  const nis = normNISN(Utils.getSiswaNIS(siswa));
+  const namaS = normStr(Utils.getSiswaNama(siswa));
   let sakit = 0, izin = 0, alpa = 0;
 
   state.absensiHarian.forEach(row => {
-    const rNisn = String(row.nisn || row.NISN || row.nis || row.NIS || '').trim().toLowerCase();
-    const rNama = String(row.nama_siswa || row.NAMA_SISWA || row.nama || row.NAMA || '').trim().toLowerCase();
+    const rNisn = normNISN(row.nisn || row.NISN || row.nis || row.NIS || '');
+    const rNama = normStr(row.nama_siswa || row.NAMA_SISWA || row.nama || row.NAMA || '');
     const cocok = (nisn && rNisn === nisn) || (nis && rNisn === nis) || (namaS && rNama === namaS);
     if (!cocok) return;
 
     const rawStatus = row.STATUS_AKHIR ?? row.status_akhir ?? row.status ?? row.keterangan ?? row.kehadiran ?? '';
-    const st = String(rawStatus).trim().toLowerCase();
+    const st = normStr(rawStatus);
 
     if (st === 'sakit' || st === 's') sakit++;
     else if (st === 'izin' || st === 'i') izin++;
@@ -1061,7 +1118,7 @@ function onKelasCetakChange() {
   if (!elKelas) return;
   const kelas = elKelas.value;
   const siswaKelas = state.siswa
-    .filter(s => Utils.getSiswaKelas(s) === kelas)
+    .filter(s => normStr(Utils.getSiswaKelas(s)) === normStr(kelas))
     .sort((a, b) => Utils.getSiswaNama(a).localeCompare(Utils.getSiswaNama(b), 'id'));
 
   const elSiswa = document.getElementById('filterSiswaCetak');
@@ -1095,7 +1152,7 @@ function getPrintContextForSiswa(siswa) {
     walasObj: state.raporWaliKelas[`${tahun}|${kelas}`],
     kepalaSekolah: state.kepalaSekolah,
     tglCetakDefault: document.getElementById('inputTanggalCetak')?.value || 'Wakatobi, 20 Desember 2026',
-    getNilaiFn: cariNilaiSiswaUntukMapel
+    getNilaiFn: (t, s, k, n, km, nm) => cariNilaiSiswaUntukMapel(t, s, k, n, km, nm, Utils.getSiswaNama(siswa))
   };
 }
 
@@ -1110,6 +1167,11 @@ function renderPreviewRapor() {
     return;
   }
 
+  if (typeof RaporPrinter === 'undefined' || typeof RaporPrinter.buildRaporDuaHalamanHTML !== 'function') {
+    container.innerHTML = `<div class="bg-amber-50 border border-amber-300 text-amber-800 p-6 rounded-xl text-center text-xs font-medium">Modul cetak <b>rapor-print.js</b> belum dimuat oleh browser. Pastikan file <b>rapor-print.js</b> berada satu folder dengan <b>index.html</b> lalu tekan <b>Ctrl + Shift + R</b>.</div>`;
+    return;
+  }
+
   container.innerHTML = RaporPrinter.buildRaporDuaHalamanHTML(siswa, getPrintContextForSiswa(siswa));
 }
 
@@ -1119,9 +1181,14 @@ function cetakSatuSiswa() {
 }
 
 function cetakSemuaSatuKelas() {
+  if (typeof RaporPrinter === 'undefined' || typeof RaporPrinter.buildRaporDuaHalamanHTML !== 'function') {
+    Utils.showToast('File rapor-print.js belum dimuat. Tekan Ctrl + Shift + R.', true);
+    return;
+  }
+
   const kelas = document.getElementById('filterKelasCetak').value;
   const siswaKelas = state.siswa
-    .filter(s => Utils.getSiswaKelas(s) === kelas)
+    .filter(s => normStr(Utils.getSiswaKelas(s)) === normStr(kelas))
     .sort((a, b) => Utils.getSiswaNama(a).localeCompare(Utils.getSiswaNama(b), 'id'));
 
   if (siswaKelas.length === 0) return;
@@ -1140,7 +1207,7 @@ function renderAdminWalas() {
   const tbody = document.getElementById('tbodyAdminWalas');
 
   tbody.innerHTML = kelasList.map((kelas, idx) => {
-    const jmlSiswa = state.siswa.filter(s => Utils.getSiswaKelas(s) === kelas).length;
+    const jmlSiswa = state.siswa.filter(s => normStr(Utils.getSiswaKelas(s)) === normStr(kelas)).length;
     const saved = state.raporWaliKelas[`${tahun}|${kelas}`];
     const fk = Utils.deteksiFaseKelompok(kelas);
 
@@ -1211,7 +1278,7 @@ async function simpanWaliKelasKeServer() {
   }
 }
 
-// ================= TAB 6: ADMIN - SUSUNAN MAPEL PER KELAS (X TKJ, X TKR, DLL) =================
+// ================= TAB 6: ADMIN - SUSUNAN MAPEL PER KELAS =================
 function renderAdminSettingMapel() {
   const kelas = document.getElementById('adminKelasMapelSelect')?.value;
   const tbody = document.getElementById('tbodyAdminMapel');
@@ -1268,7 +1335,7 @@ function tambahMapelKeKelas() {
   const namaBersih = bersihkanNamaMapel(namaRaw);
 
   const list = state.raporSettingMapel[kelas] || [];
-  if (list.some(x => x.kode_mapel === kode || bersihkanNamaMapel(x.nama_mapel_cetak).toLowerCase() === namaBersih.toLowerCase())) {
+  if (list.some(x => x.kode_mapel === kode || normStr(bersihkanNamaMapel(x.nama_mapel_cetak)) === normStr(namaBersih))) {
     Utils.showToast(`Mata pelajaran tersebut sudah ada di kelas ${kelas}.`, true);
     return;
   }
@@ -1318,7 +1385,7 @@ function salinMapelKeKelasLain() {
 
   const tujuan = prompt(`Salin susunan mapel dari ${sumberKelas} ke kelas mana?\nPilihan kelas tersedia:\n${kelasList.join(', ')}`);
   if (!tujuan) return;
-  const targetKelas = kelasList.find(k => k.toLowerCase() === tujuan.trim().toLowerCase());
+  const targetKelas = kelasList.find(k => normStr(k) === normStr(tujuan));
   if (!targetKelas) {
     Utils.showToast('Nama kelas tujuan tidak ditemukan di daftar kelas.', true);
     return;
