@@ -1151,7 +1151,7 @@ function getPrintContextForSiswa(siswa) {
     absAuto,
     walasObj: state.raporWaliKelas[`${tahun}|${kelas}`],
     kepalaSekolah: state.kepalaSekolah,
-    tglCetakDefault: document.getElementById('inputTanggalCetak')?.value || 'Wakatobi, 20 Desember 2026',
+    tglCetakDefault: document.getElementById('inputTanggalCetak')?.value || 'Wakatobi, 19 Desember 2026',
     getNilaiFn: (t, s, k, n, km, nm) => cariNilaiSiswaUntukMapel(t, s, k, n, km, nm, Utils.getSiswaNama(siswa))
   };
 }
