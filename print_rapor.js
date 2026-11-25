@@ -170,7 +170,7 @@ const RaporPrinter = {
             </tr>
             <tr>
               <td colspan="3" style="padding-top:18px;">
-                <div style="width:45%; margin-left:44%; text-align:left;">
+                <div style="width:45%; margin-left:38%; text-align:left;">
                   Mengetahui,<br>
                   Plt. Kepala Sekolah
                   <div style="height:54px;"></div>
