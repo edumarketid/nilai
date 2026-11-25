@@ -1,74 +1,69 @@
-// db.js - Lapisan Akses Database Server (Baca-Saja Tabel Existing + Baca-Tulis Tabel rapor_*)
-const dbClient = window.supabase.createClient(APP_CONFIG.SERVER_URL, APP_CONFIG.SERVER_ANON_KEY);
+// db.js - Layanan Komunikasi Database Supabase
+const supabaseClient = window.supabase.createClient(
+  APP_CONFIG.SUPABASE_URL,
+  APP_CONFIG.SUPABASE_ANON_KEY
+);
 
 const DBService = {
-  // Baca semua tabel sumber dengan limit 5000 baris & pelaporan error jelas
   async fetchAllSourceTables() {
-    const [resSiswa, resGuru, resMapel, resAdmin, resUjian, resAbsensi] = await Promise.all([
-      dbClient.from('siswa').select('*').range(0, 4999),
-      dbClient.from('guru').select('*').range(0, 1999),
-      dbClient.from('mapel').select('*').range(0, 999),
-      dbClient.from('admin').select('*').range(0, 499),
-      dbClient.from('hasil_ujian').select('*').range(0, 9999),
-      dbClient.from('absensi_harian').select('*').range(0, 9999)
+    const [siswaRes, guruRes, mapelRes, adminRes, ujianRes, absenRes] = await Promise.all([
+      supabaseClient.from('siswa').select('*').limit(5000),
+      supabaseClient.from('guru').select('*').limit(1000),
+      supabaseClient.from('mapel').select('*').limit(1000),
+      supabaseClient.from('admin').select('*').limit(200),
+      supabaseClient.from('hasil_ujian').select('*').limit(10000),
+      supabaseClient.from('absensi_harian').select('*').limit(10000)
     ]);
 
-    const errors = [];
-    if (resSiswa.error) errors.push(`siswa: ${resSiswa.error.message}`);
-    if (resGuru.error) errors.push(`guru: ${resGuru.error.message}`);
-    if (resMapel.error) errors.push(`mapel: ${resMapel.error.message}`);
-
     return {
-      siswa: resSiswa.data || [],
-      guru: resGuru.data || [],
-      mapel: resMapel.data || [],
-      admin: resAdmin.data || [],
-      hasilUjian: resUjian.data || [],
-      absensiHarian: resAbsensi.data || [],
-      errors
+      siswa: siswaRes.data || [],
+      guru: guruRes.data || [],
+      mapel: mapelRes.data || [],
+      admin: adminRes.data || [],
+      hasilUjian: ujianRes.data || [],
+      absensiHarian: absenRes.data || []
     };
   },
 
-  // Baca 4 tabel khusus penyimpanan E-Rapor
   async fetchAllRaporTables() {
-    const [resRNilai, resRWalas, resRMapel, resRPelengkap] = await Promise.all([
-      dbClient.from('rapor_nilai').select('*').range(0, 9999),
-      dbClient.from('rapor_wali_kelas').select('*').range(0, 999),
-      dbClient.from('rapor_setting_mapel').select('*').range(0, 999),
-      dbClient.from('rapor_pelengkap').select('*').range(0, 4999)
+    const [nilaiRes, walasRes, mapelRes, pelengkapRes] = await Promise.all([
+      supabaseClient.from('rapor_nilai').select('*').limit(10000),
+      supabaseClient.from('rapor_wali_kelas').select('*').limit(1000),
+      supabaseClient.from('rapor_setting_mapel').select('*').order('urutan', { ascending: true }).limit(5000),
+      supabaseClient.from('rapor_pelengkap').select('*').limit(5000)
     ]);
 
     return {
-      raporNilai: resRNilai.error ? [] : (resRNilai.data || []),
-      raporWaliKelas: resRWalas.error ? [] : (resRWalas.data || []),
-      raporSettingMapel: resRMapel.error ? [] : (resRMapel.data || []),
-      raporPelengkap: resRPelengkap.error ? [] : (resRPelengkap.data || [])
+      raporNilai: nilaiRes.data || [],
+      raporWaliKelas: walasRes.data || [],
+      raporSettingMapel: mapelRes.data || [],
+      raporPelengkap: pelengkapRes.data || []
     };
   },
 
-  async upsertRaporNilai(payload) {
-    return await dbClient.from('rapor_nilai').upsert(payload, {
-      onConflict: 'tahun_pelajaran,semester,kelas,nisn,kode_mapel'
-    });
+  async upsertRaporNilai(records) {
+    if (!records || records.length === 0) return { error: null };
+    return await supabaseClient
+      .from('rapor_nilai')
+      .upsert(records, { onConflict: 'tahun_pelajaran,semester,kelas,nisn,kode_mapel' });
   },
 
-  async upsertWaliKelas(payload) {
-    return await dbClient.from('rapor_wali_kelas').upsert(payload, {
-      onConflict: 'tahun_pelajaran,kelas'
-    });
+  async upsertWaliKelas(records) {
+    if (!records || records.length === 0) return { error: null };
+    return await supabaseClient
+      .from('rapor_wali_kelas')
+      .upsert(records, { onConflict: 'tahun_pelajaran,kelas' });
   },
 
-  async replaceSettingMapel(faseKey, payload) {
-    await dbClient.from('rapor_setting_mapel').delete().eq('fase_key', faseKey);
-    if (payload.length > 0) {
-      return await dbClient.from('rapor_setting_mapel').insert(payload);
-    }
-    return { error: null };
+  async replaceSettingMapel(faseKey, records) {
+    await supabaseClient.from('rapor_setting_mapel').delete().eq('fase_key', faseKey);
+    if (!records || records.length === 0) return { error: null };
+    return await supabaseClient.from('rapor_setting_mapel').insert(records);
   },
 
   async upsertPelengkap(record) {
-    return await dbClient.from('rapor_pelengkap').upsert(record, {
-      onConflict: 'tahun_pelajaran,semester,kelas,nisn'
-    });
+    return await supabaseClient
+      .from('rapor_pelengkap')
+      .upsert([record], { onConflict: 'tahun_pelajaran,semester,kelas,nisn' });
   }
 };
