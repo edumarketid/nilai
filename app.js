@@ -9,11 +9,16 @@ const state = {
   absensiHarian: [],
   raporNilai: {},
   raporWaliKelas: {},
-  raporSettingMapel: {}, // Key: nama kelas (misal "X TKJ", "X TKR") atau fallback fase_key
+  raporSettingMapel: {},
   raporPelengkap: {},
   jumlahTP: 3,
   kepalaSekolah: { nama: 'NUDDIN MAJIDO, S.Pd., M.Pd.', nip: '197712092005021005' }
 };
+
+// Bersihkan akhiran nama kelas dalam kurung pada nama mapel, misal: "PAI (XI TKJ)" -> "PAI"
+function bersihkanNamaMapel(nama) {
+  return String(nama || '').replace(/\s*\([^)]*\)\s*$/g, '').trim() || String(nama || '').trim();
+}
 
 // ================= SINKRONISASI & CACHE LOKAL =================
 async function syncAllFromServer(notify = false) {
@@ -111,15 +116,16 @@ function buildDefaultMapelArrayForKelas(kelas) {
     }));
   }
 
-  return state.mapel.map((m, idx) => {
-    const nama = Utils.getMapelNama(m);
-    const isUmum = /agama|pancasila|indonesia|jasmani|pjok|sejarah|muatan lokal|mulok|matematika|inggris|seni|informatika|ipas/i.test(nama);
+  const mapelCocok = getFilteredMapelForKelas(kelas);
+  return mapelCocok.map((m, idx) => {
+    const namaBersih = bersihkanNamaMapel(Utils.getMapelNama(m));
+    const isUmum = /agama|pancasila|indonesia|jasmani|pjok|sejarah|muatan lokal|mulok|matematika|inggris|seni|informatika|ipas/i.test(namaBersih);
     return {
       fase_key: kelas,
       urutan: idx + 1,
       kelompok: isUmum ? 'A' : 'B',
       kode_mapel: Utils.getMapelKode(m),
-      nama_mapel_cetak: nama,
+      nama_mapel_cetak: namaBersih,
       aktif: true
     };
   });
@@ -132,6 +138,27 @@ function initDefaultSettingMapelPerKelas() {
       state.raporSettingMapel[kelas] = buildDefaultMapelArrayForKelas(kelas);
     }
   });
+}
+
+// Filter mapel dari tabel mapel agar sesuai dengan kelas yang dipilih (jika tabel mapel menyertakan nama kelas)
+function getFilteredMapelForKelas(kelas) {
+  const allKelasLower = getUniqueKelasList().map(k => k.toLowerCase());
+  const targetLower = String(kelas || '').toLowerCase().trim();
+
+  const filtered = state.mapel.filter(m => {
+    const nama = Utils.getMapelNama(m).toLowerCase();
+    const mapelKelasKolom = String(m.kelas || m.KELAS || '').toLowerCase().trim();
+    if (mapelKelasKolom) return mapelKelasKolom === targetLower;
+
+    // Cek apakah nama mapel mengandung nama salah satu kelas di dalam kurung
+    const matchedKelasInName = allKelasLower.find(k => nama.includes(`(${k})`) || nama.endsWith(` ${k}`));
+    if (matchedKelasInName) {
+      return matchedKelasInName === targetLower;
+    }
+    return true;
+  });
+
+  return filtered.length > 0 ? filtered : state.mapel;
 }
 
 // ================= AUTENTIKASI 3 PERAN =================
@@ -332,45 +359,53 @@ function getUniqueKelasList() {
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'id'));
 }
 
-function populateAllDropdowns() {
-  const kelasList = getUniqueKelasList();
-  const selKelasNilai = document.getElementById('filterKelasNilai');
-  if (selKelasNilai) {
-    const prevKelas = selKelasNilai.value;
-    const faseFilter = document.getElementById('filterFaseNilai')?.value || 'ALL';
-    const filteredKelas = faseFilter === 'ALL'
-      ? kelasList
-      : kelasList.filter(k => Utils.deteksiFaseKelompok(k) === faseFilter);
-
-    selKelasNilai.innerHTML = filteredKelas.map(k => `<option value="${k}">${k}</option>`).join('');
-    if (prevKelas && filteredKelas.includes(prevKelas)) {
-      selKelasNilai.value = prevKelas;
-    }
-  }
-
+function updateDropdownMapelUntukKelas(kelasAktif) {
   const selMapelNilai = document.getElementById('filterMapelNilai');
-  const prevMapel = selMapelNilai ? selMapelNilai.value : '';
   const badgesContainer = document.getElementById('mapelQuickBadges');
+  if (!selMapelNilai) return;
+
+  const prevMapelNama = bersihkanNamaMapel(selMapelNilai.options[selMapelNilai.selectedIndex]?.text || '');
+  const prevMapelKode = selMapelNilai.value;
   const guruMapels = state.user?.mapelList || [];
+  const mapelSesuaiKelas = getFilteredMapelForKelas(kelasAktif);
 
   let mapelOptions = [];
   if (state.user?.role === 'GURU' && guruMapels.length > 0) {
     guruMapels.forEach(gm => {
-      const match = state.mapel.find(m =>
+      const gmBersih = bersihkanNamaMapel(gm).toLowerCase();
+      const match = mapelSesuaiKelas.find(m =>
+        bersihkanNamaMapel(Utils.getMapelNama(m)).toLowerCase() === gmBersih ||
         Utils.getMapelNama(m).toLowerCase() === gm.toLowerCase() ||
         Utils.getMapelKode(m).toLowerCase() === gm.toLowerCase()
       );
-      mapelOptions.push(match ? { kode: Utils.getMapelKode(match), nama: Utils.getMapelNama(match) } : { kode: gm, nama: gm });
+      if (match) {
+        mapelOptions.push({ kode: Utils.getMapelKode(match), nama: bersihkanNamaMapel(Utils.getMapelNama(match)), raw: Utils.getMapelNama(match) });
+      } else {
+        mapelOptions.push({ kode: gm, nama: bersihkanNamaMapel(gm), raw: gm });
+      }
     });
   } else {
-    mapelOptions = state.mapel.map(m => ({ kode: Utils.getMapelKode(m), nama: Utils.getMapelNama(m) }));
+    mapelOptions = mapelSesuaiKelas.map(m => ({
+      kode: Utils.getMapelKode(m),
+      nama: bersihkanNamaMapel(Utils.getMapelNama(m)),
+      raw: Utils.getMapelNama(m)
+    }));
   }
 
-  if (selMapelNilai) {
-    selMapelNilai.innerHTML = mapelOptions.map(m => `<option value="${m.kode}">${m.nama}</option>`).join('');
-    if (prevMapel && mapelOptions.some(m => m.kode === prevMapel)) {
-      selMapelNilai.value = prevMapel;
-    }
+  // Hilangkan duplikat nama mapel bersih pada dropdown
+  const seen = new Set();
+  mapelOptions = mapelOptions.filter(item => {
+    const k = item.nama.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  selMapelNilai.innerHTML = mapelOptions.map(m => `<option value="${m.kode}">${m.nama}</option>`).join('');
+
+  const matchPrev = mapelOptions.find(m => m.kode === prevMapelKode || m.nama === prevMapelNama);
+  if (matchPrev) {
+    selMapelNilai.value = matchPrev.kode;
   }
 
   if (badgesContainer) {
@@ -385,6 +420,24 @@ function populateAllDropdowns() {
     } else {
       badgesContainer.innerHTML = '';
     }
+  }
+}
+
+function populateAllDropdowns() {
+  const kelasList = getUniqueKelasList();
+  const selKelasNilai = document.getElementById('filterKelasNilai');
+  if (selKelasNilai) {
+    const prevKelas = selKelasNilai.value;
+    const faseFilter = document.getElementById('filterFaseNilai')?.value || 'ALL';
+    const filteredKelas = faseFilter === 'ALL'
+      ? kelasList
+      : kelasList.filter(k => Utils.deteksiFaseKelompok(k) === faseFilter);
+
+    selKelasNilai.innerHTML = filteredKelas.map(k => `<option value="${k}">${k}</option>`).join('');
+    if (prevKelas && filteredKelas.includes(prevKelas)) {
+      selKelasNilai.value = prevKelas;
+    }
+    updateDropdownMapelUntukKelas(selKelasNilai.value);
   }
 
   const targetKelasWalas = (state.user?.role === 'WALI_KELAS' && state.user.kelasBinaan)
@@ -431,6 +484,7 @@ function onFaseNilaiChange() {
   const filtered = faseFilter === 'ALL' ? allKelas : allKelas.filter(k => Utils.deteksiFaseKelompok(k) === faseFilter);
   selKelas.innerHTML = filtered.map(k => `<option value="${k}">${k}</option>`).join('');
   if (prevKelas && filtered.includes(prevKelas)) selKelas.value = prevKelas;
+  updateDropdownMapelUntukKelas(selKelas.value);
   renderTabelNilai();
 }
 
@@ -454,12 +508,12 @@ function cariNilaiSASServer(siswa, kodeMapel, namaMapel) {
   const nis = Utils.getSiswaNIS(siswa).toLowerCase();
   const namaS = Utils.getSiswaNama(siswa).toLowerCase();
   const km = kodeMapel.toLowerCase();
-  const nm = namaMapel.toLowerCase();
+  const nm = bersihkanNamaMapel(namaMapel).toLowerCase();
 
   const match = state.hasilUjian.find(h => {
     const hNisn = String(h.nisn || h.NISN || h.nis || h.NIS || '').trim().toLowerCase();
     const hNama = String(h.nama_siswa || h.NAMA_SISWA || h.nama || h.NAMA || '').trim().toLowerCase();
-    const hMapel = String(h.kode_mapel || h.KODE_MAPEL || h.mapel || h.MAPEL || h.nama_mapel || '').trim().toLowerCase();
+    const hMapel = bersihkanNamaMapel(String(h.kode_mapel || h.KODE_MAPEL || h.mapel || h.MAPEL || h.nama_mapel || '')).toLowerCase();
     const siswaCocok = (nisn && hNisn === nisn) || (nis && hNisn === nis) || (namaS && hNama === namaS);
     const mapelCocok = hMapel === km || hMapel === nm || hMapel.includes(nm) || nm.includes(hMapel);
     return siswaCocok && mapelCocok;
@@ -475,9 +529,12 @@ function renderTabelNilai() {
   const semester = document.getElementById('globalSemester').value;
   const selKelas = document.getElementById('filterKelasNilai');
   const kelas = selKelas.options[selKelas.selectedIndex]?.value || selKelas.value;
+
+  updateDropdownMapelUntukKelas(kelas);
+
   const selMapel = document.getElementById('filterMapelNilai');
   const kodeMapel = selMapel.value;
-  const namaMapel = selMapel.options[selMapel.selectedIndex]?.text || kodeMapel;
+  const namaMapel = bersihkanNamaMapel(selMapel.options[selMapel.selectedIndex]?.text || kodeMapel);
 
   document.getElementById('judulTabelNilai').textContent = `Pengolahan Nilai: ${namaMapel} — Kelas ${kelas || '-'}`;
 
@@ -486,7 +543,7 @@ function renderTabelNilai() {
     .sort((a, b) => Utils.getSiswaNama(a).localeCompare(Utils.getSiswaNama(b), 'id'));
 
   siswaKelas.forEach(s => {
-    const saved = state.raporNilai[`${tahun}|${semester}|${kelas}|${Utils.getSiswaNISN(s)}|${kodeMapel}`];
+    const saved = cariNilaiSiswaUntukMapel(tahun, semester, kelas, Utils.getSiswaNISN(s), kodeMapel, namaMapel);
     if (saved && Array.isArray(saved.nilai_sumatif) && saved.nilai_sumatif.length > state.jumlahTP) {
       state.jumlahTP = saved.nilai_sumatif.length;
     }
@@ -518,8 +575,7 @@ function renderTabelNilai() {
   tbody.innerHTML = siswaKelas.map((s, idx) => {
     const nisn = Utils.getSiswaNISN(s);
     const nama = Utils.getSiswaNama(s);
-    const key = `${tahun}|${semester}|${kelas}|${nisn}|${kodeMapel}`;
-    const saved = state.raporNilai[key] || {};
+    const saved = cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, kodeMapel, namaMapel) || {};
     const tpArr = Array.isArray(saved.nilai_sumatif) ? saved.nilai_sumatif : [];
 
     let sasVal = (saved.nilai_sas !== undefined && saved.nilai_sas !== null && saved.nilai_sas !== '')
@@ -572,7 +628,7 @@ function renderTabelNilai() {
 
 function hitungBarisNilai(nisn) {
   const selMapel = document.getElementById('filterMapelNilai');
-  const namaMapel = selMapel.options[selMapel.selectedIndex]?.text || '';
+  const namaMapel = bersihkanNamaMapel(selMapel.options[selMapel.selectedIndex]?.text || '');
   const tpInputs = document.querySelectorAll(`.inp-tp-${nisn}`);
   const tpVals = Array.from(tpInputs).map(inp => inp.value);
   const sasVal = document.getElementById(`sas-${nisn}`).value;
@@ -597,7 +653,7 @@ async function tarikNilaiSASDariServer() {
   const kelas = selKelas.value;
   const selMapel = document.getElementById('filterMapelNilai');
   const kodeMapel = selMapel.value;
-  const namaMapel = selMapel.options[selMapel.selectedIndex]?.text || kodeMapel;
+  const namaMapel = bersihkanNamaMapel(selMapel.options[selMapel.selectedIndex]?.text || kodeMapel);
 
   const siswaKelas = state.siswa.filter(s => Utils.getSiswaKelas(s) === kelas);
   let terisi = 0;
@@ -625,7 +681,7 @@ async function simpanNilaiMapelKeServer() {
   const kelas = selKelas.options[selKelas.selectedIndex]?.value || selKelas.value;
   const selMapel = document.getElementById('filterMapelNilai');
   const kodeMapel = selMapel.value;
-  const namaMapel = selMapel.options[selMapel.selectedIndex]?.text || kodeMapel;
+  const namaMapel = bersihkanNamaMapel(selMapel.options[selMapel.selectedIndex]?.text || kodeMapel);
 
   if (!kelas) {
     Utils.showToast('Pilih kelas terlebih dahulu sebelum menyimpan.', true);
@@ -694,11 +750,11 @@ function getMapelSusunanByKelas(kelas) {
   const listFase = state.raporSettingMapel[fk] || [];
   if (listFase.length > 0) return listFase.filter(m => m.aktif !== false);
 
-  return state.mapel.map((m, i) => ({
+  return getFilteredMapelForKelas(kelas).map((m, i) => ({
     urutan: i + 1,
     kelompok: 'A',
     kode_mapel: Utils.getMapelKode(m),
-    nama_mapel_cetak: Utils.getMapelNama(m),
+    nama_mapel_cetak: bersihkanNamaMapel(Utils.getMapelNama(m)),
     aktif: true
   }));
 }
@@ -707,11 +763,12 @@ function cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, kodeMapel, namaM
   const exact = state.raporNilai[`${tahun}|${semester}|${kelas}|${nisn}|${kodeMapel}`];
   if (exact) return exact;
 
+  const targetNamaBersih = bersihkanNamaMapel(namaMapel).toLowerCase();
   const prefix = `${tahun}|${semester}|${kelas}|${nisn}|`;
   const foundKey = Object.keys(state.raporNilai).find(k => {
     if (!k.startsWith(prefix)) return false;
     const item = state.raporNilai[k];
-    return String(item.nama_mapel || '').toLowerCase() === String(namaMapel || '').toLowerCase();
+    return bersihkanNamaMapel(item.nama_mapel || '').toLowerCase() === targetNamaBersih;
   });
   return foundKey ? state.raporNilai[foundKey] : null;
 }
@@ -826,7 +883,6 @@ function hitungAbsensiDariServer(siswa) {
     const cocok = (nisn && rNisn === nisn) || (nis && rNisn === nis) || (namaS && rNama === namaS);
     if (!cocok) return;
 
-    // Prioritas membaca kolom STATUS_AKHIR (huruf kapital) dari tabel absensi_harian
     const rawStatus = row.STATUS_AKHIR ?? row.status_akhir ?? row.status ?? row.keterangan ?? row.kehadiran ?? '';
     const st = String(rawStatus).trim().toLowerCase();
 
@@ -1182,10 +1238,11 @@ function tambahMapelKeKelas() {
   if (!kelas) return;
   const sel = document.getElementById('adminTambahMapelSelect');
   const kode = sel.value;
-  const nama = sel.options[sel.selectedIndex]?.text || kode;
+  const namaRaw = sel.options[sel.selectedIndex]?.text || kode;
+  const namaBersih = bersihkanNamaMapel(namaRaw);
 
   const list = state.raporSettingMapel[kelas] || [];
-  if (list.some(x => x.kode_mapel === kode)) {
+  if (list.some(x => x.kode_mapel === kode || bersihkanNamaMapel(x.nama_mapel_cetak).toLowerCase() === namaBersih.toLowerCase())) {
     Utils.showToast(`Mata pelajaran tersebut sudah ada di kelas ${kelas}.`, true);
     return;
   }
@@ -1195,7 +1252,7 @@ function tambahMapelKeKelas() {
     urutan: list.length + 1,
     kelompok: 'A',
     kode_mapel: kode,
-    nama_mapel_cetak: nama,
+    nama_mapel_cetak: namaBersih,
     aktif: true
   });
   state.raporSettingMapel[kelas] = list;
