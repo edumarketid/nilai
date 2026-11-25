@@ -127,14 +127,18 @@ const Utils = {
   },
 
   showToast(msg, isError = false) {
-    const box = document.getElementById('toastBox');
-    if (!box) return;
+    let box = document.getElementById('toastBox') || document.getElementById('toastBanner');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'toastBanner';
+      document.body.appendChild(box);
+    }
     box.textContent = msg;
-    box.className = `no-print fixed bottom-5 right-5 z-50 max-w-sm text-xs px-4 py-3 rounded-xl shadow-xl border ${
-      isError ? 'bg-rose-900 text-white border-rose-700' : 'bg-slate-900 text-white border-slate-700'
+    box.className = `no-print fixed bottom-5 right-5 z-[9999] max-w-sm text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border ${
+      isError ? 'bg-rose-800 text-white border-rose-600' : 'bg-slate-900 text-white border-slate-700'
     }`;
     box.classList.remove('hidden');
     clearTimeout(window._toastTimer);
-    window._toastTimer = setTimeout(() => box.classList.add('hidden'), 3500);
+    window._toastTimer = setTimeout(() => box.classList.add('hidden'), 3800);
   }
 };
