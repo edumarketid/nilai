@@ -1,17 +1,17 @@
 // db.js - Layanan Komunikasi Database Supabase (SMKN 1 Wakatobi)
-const _SB_URL = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SUPABASE_URL)
-  ? APP_CONFIG.SUPABASE_URL
+const _SERVER_URL = (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.SERVER_URL || APP_CONFIG.SUPABASE_URL))
+  ? (APP_CONFIG.SERVER_URL || APP_CONFIG.SUPABASE_URL)
   : 'https://nbwpnhshhpfqtmbwewgk.supabase.co';
 
-const _SB_KEY = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SUPABASE_ANON_KEY)
-  ? APP_CONFIG.SUPABASE_ANON_KEY
-  : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5id3BuaHNoaHBmcXRtYndld2drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4MTI0ODAsImV4cCI6MjA3ODM4ODQ4MH0.9c8m9Q8j6l1u0k9v1p2w3x4y5z6a7b8c9d0e1f2g3h4';
+const _SERVER_KEY = (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.SERVER_ANON_KEY || APP_CONFIG.SUPABASE_ANON_KEY))
+  ? (APP_CONFIG.SERVER_ANON_KEY || APP_CONFIG.SUPABASE_ANON_KEY)
+  : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5id3BuaHNoaHBmcXRtYndld2drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTQ1ODUsImV4cCI6MjEwNzk5MDU4NX0.2Ah6o8svWPMDEI1O3zOxytNyqBIjED7GXTxowNm1Ai4';
 
 if (!window.supabase) {
   throw new Error('Library Supabase CDN gagal dimuat. Periksa koneksi internet.');
 }
 
-const supabaseClient = window.supabase.createClient(_SB_URL, _SB_KEY);
+const supabaseClient = window.supabase.createClient(_SERVER_URL, _SERVER_KEY);
 
 async function safeSelect(tableName, orderCol = null, maxRows = 5000) {
   try {
