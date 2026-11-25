@@ -1,44 +1,57 @@
-// db.js - Layanan Komunikasi Database Supabase (SMKN 1 Wakatobi)
-const _SERVER_URL = (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.SERVER_URL || APP_CONFIG.SUPABASE_URL))
-  ? (APP_CONFIG.SERVER_URL || APP_CONFIG.SUPABASE_URL)
-  : 'https://nbwpnhshhpfqtmbwewgk.supabase.co';
-
-const _SERVER_KEY = (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.SERVER_ANON_KEY || APP_CONFIG.SUPABASE_ANON_KEY))
-  ? (APP_CONFIG.SERVER_ANON_KEY || APP_CONFIG.SUPABASE_ANON_KEY)
-  : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5id3BuaHNoaHBmcXRtYndld2drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTQ1ODUsImV4cCI6MjEwNzk5MDU4NX0.2Ah6o8svWPMDEI1O3zOxytNyqBIjED7GXTxowNm1Ai4';
+// db.js - Layanan Komunikasi Database Supabase (Membaca Kredensial Murni dari config.js)
+if (typeof APP_CONFIG === 'undefined' || !APP_CONFIG.SERVER_URL || !APP_CONFIG.SERVER_ANON_KEY) {
+  throw new Error('Konfigurasi APP_CONFIG pada config.js tidak ditemukan atau belum lengkap.');
+}
 
 if (!window.supabase) {
   throw new Error('Library Supabase CDN gagal dimuat. Periksa koneksi internet.');
 }
 
-const supabaseClient = window.supabase.createClient(_SERVER_URL, _SERVER_KEY);
+const supabaseClient = window.supabase.createClient(
+  APP_CONFIG.SERVER_URL,
+  APP_CONFIG.SERVER_ANON_KEY
+);
 
-async function safeSelect(tableName, orderCol = null, maxRows = 5000) {
-  try {
-    let q = supabaseClient.from(tableName).select('*');
-    if (orderCol) q = q.order(orderCol, { ascending: true });
-    if (maxRows) q = q.limit(maxRows);
-    const { data, error } = await q;
-    if (error) {
-      console.warn(`Tabel ${tableName} gagal dimuat:`, error.message);
-      return { data: [], error };
+// Tarik seluruh baris tabel bertahap per 1000 baris agar tidak terpotong limit default API Supabase
+async function fetchAllRowsPaginated(tableName, orderCol = null, maxPages = 30) {
+  let allData = [];
+  const pageSize = 1000;
+  let lastError = null;
+
+  for (let page = 0; page < maxPages; page++) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    try {
+      let q = supabaseClient.from(tableName).select('*').range(from, to);
+      if (orderCol) q = q.order(orderCol, { ascending: true });
+      const { data, error } = await q;
+      if (error) {
+        lastError = error;
+        console.warn(`Tabel ${tableName} halaman ${page} gagal:`, error.message);
+        break;
+      }
+      if (!data || data.length === 0) break;
+      allData = allData.concat(data);
+      if (data.length < pageSize) break;
+    } catch (err) {
+      lastError = err;
+      console.warn(`Exception tabel ${tableName}:`, err);
+      break;
     }
-    return { data: data || [], error: null };
-  } catch (err) {
-    console.warn(`Exception tabel ${tableName}:`, err);
-    return { data: [], error: err };
   }
+
+  return { data: allData, error: allData.length > 0 ? null : lastError };
 }
 
 window.DBService = {
   async fetchAllSourceTables() {
     const [siswaRes, guruRes, mapelRes, adminRes, ujianRes, absenRes] = await Promise.all([
-      safeSelect('siswa', null, 3000),
-      safeSelect('guru', null, 500),
-      safeSelect('mapel', null, 500),
-      safeSelect('admin', null, 100),
-      safeSelect('hasil_ujian', null, 5000),
-      safeSelect('absensi_harian', null, 5000)
+      fetchAllRowsPaginated('siswa', null, 10),
+      fetchAllRowsPaginated('guru', null, 5),
+      fetchAllRowsPaginated('mapel', null, 5),
+      fetchAllRowsPaginated('admin', null, 2),
+      fetchAllRowsPaginated('hasil_ujian', null, 15),
+      fetchAllRowsPaginated('absensi_harian', null, 15)
     ]);
 
     if (siswaRes.error && guruRes.error) {
@@ -57,10 +70,10 @@ window.DBService = {
 
   async fetchAllRaporTables() {
     const [nilaiRes, walasRes, mapelRes, pelengkapRes] = await Promise.all([
-      safeSelect('rapor_nilai', null, 10000),
-      safeSelect('rapor_wali_kelas', null, 500),
-      safeSelect('rapor_setting_mapel', 'urutan', 2000),
-      safeSelect('rapor_pelengkap', null, 3000)
+      fetchAllRowsPaginated('rapor_nilai', null, 30),
+      fetchAllRowsPaginated('rapor_wali_kelas', null, 5),
+      fetchAllRowsPaginated('rapor_setting_mapel', 'urutan', 10),
+      fetchAllRowsPaginated('rapor_pelengkap', null, 10)
     ]);
 
     return {
@@ -73,9 +86,31 @@ window.DBService = {
 
   async upsertRaporNilai(records) {
     if (!records || records.length === 0) return { error: null };
-    return await supabaseClient
+
+    // Jalur 1: Upsert batch standar
+    const res = await supabaseClient
       .from('rapor_nilai')
       .upsert(records, { onConflict: 'tahun_pelajaran,semester,kelas,nisn,kode_mapel' });
+
+    if (!res.error) return res;
+
+    // Jalur 2 (Cadangan otomatis jika constraint onConflict berbeda di Supabase)
+    console.warn('Upsert onConflict gagal, beralih ke metode replace per kelas & mapel:', res.error.message);
+    const sample = records[0];
+    const nisnList = records.map(r => r.nisn).filter(Boolean);
+
+    if (sample.tahun_pelajaran && sample.semester && sample.kelas && sample.kode_mapel && nisnList.length > 0) {
+      await supabaseClient
+        .from('rapor_nilai')
+        .delete()
+        .eq('tahun_pelajaran', sample.tahun_pelajaran)
+        .eq('semester', sample.semester)
+        .eq('kelas', sample.kelas)
+        .eq('kode_mapel', sample.kode_mapel)
+        .in('nisn', nisnList);
+    }
+
+    return await supabaseClient.from('rapor_nilai').insert(records);
   },
 
   async upsertWaliKelas(records) {
