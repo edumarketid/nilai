@@ -159,8 +159,8 @@ const RaporPrinter = {
                 <div style="height:64px;"></div>
                 ........................................
               </td>
-              <td style="width:24%;"></td>
-              <td style="width:38%; vertical-align:top;">
+              <td style="width:34%;"></td>
+              <td style="width:32%; vertical-align:top;">
                 ${tglCetak}<br>
                 Wali Kelas
                 <div style="height:52px;"></div>
@@ -170,7 +170,7 @@ const RaporPrinter = {
             </tr>
             <tr>
               <td colspan="3" style="padding-top:18px;">
-                <div style="width:45%; margin:0 auto; text-align:left;">
+                <div style="width:45%; margin-left:44%; text-align:left;">
                   Mengetahui,<br>
                   Plt. Kepala Sekolah
                   <div style="height:54px;"></div>
