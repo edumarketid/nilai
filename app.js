@@ -15,7 +15,6 @@ const state = {
   kepalaSekolah: { nama: 'NUDDIN MAJIDO, S.Pd., M.Pd.', nip: '197712092005021005' }
 };
 
-// Bersihkan akhiran nama kelas dalam kurung pada nama mapel, misal: "PAI (XI TKJ)" -> "PAI"
 function bersihkanNamaMapel(nama) {
   return String(nama || '').replace(/\s*\([^)]*\)\s*$/g, '').trim() || String(nama || '').trim();
 }
@@ -41,11 +40,15 @@ async function syncAllFromServer(notify = false) {
     }
 
     const rData = await DBService.fetchAllRaporTables();
+    state.raporNilai = {};
     rData.raporNilai.forEach(row => {
-      state.raporNilai[`${row.tahun_pelajaran}|${row.semester}|${row.kelas}|${row.nisn}|${row.kode_mapel}`] = row;
+      const key = `${String(row.tahun_pelajaran || '').trim()}|${String(row.semester || '').trim()}|${String(row.kelas || '').trim()}|${String(row.nisn || '').trim()}|${String(row.kode_mapel || '').trim()}`;
+      state.raporNilai[key] = row;
     });
+
+    state.raporWaliKelas = {};
     rData.raporWaliKelas.forEach(row => {
-      state.raporWaliKelas[`${row.tahun_pelajaran}|${row.kelas}`] = row;
+      state.raporWaliKelas[`${String(row.tahun_pelajaran || '').trim()}|${String(row.kelas || '').trim()}`] = row;
     });
 
     if (rData.raporSettingMapel.length > 0) {
@@ -53,15 +56,16 @@ async function syncAllFromServer(notify = false) {
       rData.raporSettingMapel
         .sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
         .forEach(row => {
-          const key = row.fase_key;
+          const key = String(row.fase_key || '').trim();
           if (!state.raporSettingMapel[key]) state.raporSettingMapel[key] = [];
           state.raporSettingMapel[key].push(row);
         });
     }
     initDefaultSettingMapelPerKelas();
 
+    state.raporPelengkap = {};
     rData.raporPelengkap.forEach(row => {
-      state.raporPelengkap[`${row.tahun_pelajaran}|${row.semester}|${row.kelas}|${row.nisn}`] = row;
+      state.raporPelengkap[`${String(row.tahun_pelajaran || '').trim()}|${String(row.semester || '').trim()}|${String(row.kelas || '').trim()}|${String(row.nisn || '').trim()}`] = row;
     });
 
     saveLocalCache();
@@ -140,7 +144,6 @@ function initDefaultSettingMapelPerKelas() {
   });
 }
 
-// Filter mapel dari tabel mapel agar sesuai dengan kelas yang dipilih (jika tabel mapel menyertakan nama kelas)
 function getFilteredMapelForKelas(kelas) {
   const allKelasLower = getUniqueKelasList().map(k => k.toLowerCase());
   const targetLower = String(kelas || '').toLowerCase().trim();
@@ -150,7 +153,6 @@ function getFilteredMapelForKelas(kelas) {
     const mapelKelasKolom = String(m.kelas || m.KELAS || '').toLowerCase().trim();
     if (mapelKelasKolom) return mapelKelasKolom === targetLower;
 
-    // Cek apakah nama mapel mengandung nama salah satu kelas di dalam kurung
     const matchedKelasInName = allKelasLower.find(k => nama.includes(`(${k})`) || nama.endsWith(` ${k}`));
     if (matchedKelasInName) {
       return matchedKelasInName === targetLower;
@@ -379,20 +381,18 @@ function updateDropdownMapelUntukKelas(kelasAktif) {
         Utils.getMapelKode(m).toLowerCase() === gm.toLowerCase()
       );
       if (match) {
-        mapelOptions.push({ kode: Utils.getMapelKode(match), nama: bersihkanNamaMapel(Utils.getMapelNama(match)), raw: Utils.getMapelNama(match) });
+        mapelOptions.push({ kode: Utils.getMapelKode(match), nama: bersihkanNamaMapel(Utils.getMapelNama(match)) });
       } else {
-        mapelOptions.push({ kode: gm, nama: bersihkanNamaMapel(gm), raw: gm });
+        mapelOptions.push({ kode: gm, nama: bersihkanNamaMapel(gm) });
       }
     });
   } else {
     mapelOptions = mapelSesuaiKelas.map(m => ({
       kode: Utils.getMapelKode(m),
-      nama: bersihkanNamaMapel(Utils.getMapelNama(m)),
-      raw: Utils.getMapelNama(m)
+      nama: bersihkanNamaMapel(Utils.getMapelNama(m))
     }));
   }
 
-  // Hilangkan duplikat nama mapel bersih pada dropdown
   const seen = new Set();
   mapelOptions = mapelOptions.filter(item => {
     const k = item.nama.toLowerCase();
@@ -741,7 +741,7 @@ async function simpanNilaiMapelKeServer() {
   }
 }
 
-// ================= TAB 2: REKAP NILAI WALI KELAS =================
+// ================= TAB 2: REKAP NILAI WALI KELAS & ADMIN =================
 function getMapelSusunanByKelas(kelas) {
   if (state.raporSettingMapel[kelas] && state.raporSettingMapel[kelas].length > 0) {
     return state.raporSettingMapel[kelas].filter(m => m.aktif !== false);
@@ -760,17 +760,39 @@ function getMapelSusunanByKelas(kelas) {
 }
 
 function cariNilaiSiswaUntukMapel(tahun, semester, kelas, nisn, kodeMapel, namaMapel) {
-  const exact = state.raporNilai[`${tahun}|${semester}|${kelas}|${nisn}|${kodeMapel}`];
+  const tahunClean = String(tahun || '').trim();
+  const semClean = String(semester || '').trim();
+  const kelasClean = String(kelas || '').trim();
+  const nisnClean = String(nisn || '').trim();
+
+  // 1. Cek kecocokan persis berdasarkan kode_mapel
+  const exact = state.raporNilai[`${tahunClean}|${semClean}|${kelasClean}|${nisnClean}|${kodeMapel}`];
   if (exact) return exact;
 
+  // 2. Cari di antara semua nilai siswa pada tahun, semester, dan kelas yang sama
   const targetNamaBersih = bersihkanNamaMapel(namaMapel).toLowerCase();
-  const prefix = `${tahun}|${semester}|${kelas}|${nisn}|`;
-  const foundKey = Object.keys(state.raporNilai).find(k => {
-    if (!k.startsWith(prefix)) return false;
-    const item = state.raporNilai[k];
-    return bersihkanNamaMapel(item.nama_mapel || '').toLowerCase() === targetNamaBersih;
+  const prefix = `${tahunClean}|${semClean}|${kelasClean}|${nisnClean}|`;
+
+  const candidates = Object.keys(state.raporNilai)
+    .filter(k => k.startsWith(prefix))
+    .map(k => state.raporNilai[k]);
+
+  const byName = candidates.find(item => {
+    const itemNama = bersihkanNamaMapel(item.nama_mapel || '').toLowerCase();
+    return itemNama === targetNamaBersih ||
+      (targetNamaBersih.length >= 6 && itemNama.includes(targetNamaBersih)) ||
+      (itemNama.length >= 6 && targetNamaBersih.includes(itemNama));
   });
-  return foundKey ? state.raporNilai[foundKey] : null;
+
+  return byName || null;
+}
+
+async function tarikUlangRekapDariServer() {
+  const selKelas = document.getElementById('filterKelasRekap');
+  const kelasAktif = selKelas ? selKelas.value : '';
+  await syncAllFromServer(true);
+  if (selKelas && kelasAktif) selKelas.value = kelasAktif;
+  renderRekapWaliKelas();
 }
 
 function renderRekapWaliKelas() {
