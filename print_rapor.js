@@ -172,7 +172,7 @@ const RaporPrinter = {
               <td colspan="3" style="padding-top:18px;">
                 <div style="width:45%; margin:0 auto; text-align:left;">
                   Mengetahui,<br>
-                  Kepala Sekolah
+                  Plt. Kepala Sekolah
                   <div style="height:54px;"></div>
                   <b><u>${kepalaSekolah.nama}</u></b><br>
                   NIP. ${kepalaSekolah.nip}
