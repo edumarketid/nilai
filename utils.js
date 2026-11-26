@@ -89,7 +89,7 @@ const Utils = {
     return 'Fase F (Kelas XII)';
   },
 
-  hitungAngkaRapor(tpArr, sasVal) {
+  hitungAngkaRapor(tpArr, sasVal, persenSumatif = 50, persenSAS = 50) {
     const validTP = (tpArr || []).map(v => parseFloat(v)).filter(v => !isNaN(v));
     const hasSAS = sasVal !== '' && sasVal !== null && !isNaN(parseFloat(sasVal));
     const sasNum = hasSAS ? parseFloat(sasVal) : 0;
@@ -102,7 +102,17 @@ const Utils = {
       ? validTP.reduce((a, b) => a + b, 0) / validTP.length
       : sasNum;
 
-    const desimal = hasSAS ? (rata + sasNum) / 2 : rata;
+    const pSum = isNaN(parseFloat(persenSumatif)) ? 50 : parseFloat(persenSumatif);
+    const pSas = isNaN(parseFloat(persenSAS)) ? 50 : parseFloat(persenSAS);
+    const totalBobot = pSum + pSas;
+
+    let desimal = rata;
+    if (hasSAS && totalBobot > 0) {
+      desimal = ((rata * pSum) + (sasNum * pSas)) / totalBobot;
+    } else if (hasSAS) {
+      desimal = (rata + sasNum) / 2;
+    }
+
     const bulat = Math.round(desimal);
 
     return {
