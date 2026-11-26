@@ -13,6 +13,8 @@ const state = {
   raporSettingMapel: {},
   raporPelengkap: {},
   jumlahTP: 3,
+  bobotSumatif: 50,
+  bobotSAS: 50,
   kepalaSekolah: { nama: 'NUDDIN MAJIDO, S.Pd., M.Pd.', nip: '197712092005021005' }
 };
 
@@ -107,7 +109,9 @@ function saveLocalCache() {
       raporNilai: state.raporNilai,
       raporWaliKelas: state.raporWaliKelas,
       raporSettingMapel: state.raporSettingMapel,
-      raporPelengkap: state.raporPelengkap
+      raporPelengkap: state.raporPelengkap,
+      bobotSumatif: state.bobotSumatif,
+      bobotSAS: state.bobotSAS
     }));
   } catch (e) {}
 }
@@ -124,6 +128,8 @@ function loadLocalCache() {
     if (parsed.raporWaliKelas) state.raporWaliKelas = { ...parsed.raporWaliKelas, ...state.raporWaliKelas };
     if (parsed.raporSettingMapel) state.raporSettingMapel = { ...parsed.raporSettingMapel, ...state.raporSettingMapel };
     if (parsed.raporPelengkap) state.raporPelengkap = { ...parsed.raporPelengkap, ...state.raporPelengkap };
+    if (typeof parsed.bobotSumatif === 'number') state.bobotSumatif = parsed.bobotSumatif;
+    if (typeof parsed.bobotSAS === 'number') state.bobotSAS = parsed.bobotSAS;
   } catch (e) {}
 }
 
@@ -505,6 +511,98 @@ function onFaseNilaiChange() {
   renderTabelNilai();
 }
 
+// ================= PENGATURAN BOBOT PERSENTASE NILAI RAPOR =================
+function pastikanPanelBobotPersentase() {
+  const judulEl = document.getElementById('judulTabelNilai');
+  if (!judulEl) return;
+
+  const parentHeader = judulEl.parentElement;
+  if (parentHeader) {
+    Array.from(parentHeader.querySelectorAll('p, span, div')).forEach(el => {
+      if (el.id !== 'rumusAktifTeks' && el.textContent && el.textContent.includes('Rumus Nilai Rapor:')) {
+        el.id = 'rumusAktifTeks';
+      }
+    });
+  }
+
+  if (!document.getElementById('panelBobotPersentase')) {
+    const bar = document.createElement('div');
+    bar.id = 'panelBobotPersentase';
+    bar.className = 'mt-2 flex flex-wrap items-center gap-3 bg-blue-50/80 border border-blue-200 rounded-lg px-3 py-2 text-xs';
+    bar.innerHTML = `
+      <span class="font-bold text-blue-900">Bobot Nilai Rapor:</span>
+      <label class="flex items-center gap-1.5 text-slate-700 font-medium">
+        <span>Rata-Rata Sumatif:</span>
+        <input type="number" id="inputPersenSumatif" min="0" max="100" step="1" value="${state.bobotSumatif}"
+          oninput="ubahBobotPersentase('sumatif')"
+          class="w-14 text-center border border-blue-300 bg-white rounded px-1.5 py-0.5 font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+        <span>%</span>
+      </label>
+      <label class="flex items-center gap-1.5 text-slate-700 font-medium">
+        <span>Sumatif Akhir (SAS):</span>
+        <input type="number" id="inputPersenSAS" min="0" max="100" step="1" value="${state.bobotSAS}"
+          oninput="ubahBobotPersentase('sas')"
+          class="w-14 text-center border border-amber-300 bg-white rounded px-1.5 py-0.5 font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+        <span>%</span>
+      </label>
+      <span id="infoRumusPersentase" class="text-[11px] text-slate-600">
+        Rumus aktif: <b>(${state.bobotSumatif}% × Rata-Rata Sumatif) + (${state.bobotSAS}% × SAS)</b>
+      </span>
+    `;
+    if (parentHeader) {
+      parentHeader.appendChild(bar);
+    }
+  } else {
+    const inpSum = document.getElementById('inputPersenSumatif');
+    const inpSas = document.getElementById('inputPersenSAS');
+    if (inpSum && document.activeElement !== inpSum) inpSum.value = state.bobotSumatif;
+    if (inpSas && document.activeElement !== inpSas) inpSas.value = state.bobotSAS;
+  }
+  perbaruiTeksRumusAktif();
+}
+
+function perbaruiTeksRumusAktif() {
+  const teks = `Rumus Nilai Rapor: (${state.bobotSumatif}% × Rata-Rata Sumatif) + (${state.bobotSAS}% × SAS) (Pembulatan Matematika)`;
+  const infoEl = document.getElementById('infoRumusPersentase');
+  if (infoEl) {
+    infoEl.innerHTML = `Rumus aktif: <b>(${state.bobotSumatif}% × Rata-Rata Sumatif) + (${state.bobotSAS}% × SAS)</b>`;
+  }
+  const rumusLamaEl = document.getElementById('rumusAktifTeks');
+  if (rumusLamaEl) {
+    rumusLamaEl.textContent = teks;
+  }
+}
+
+function ubahBobotPersentase(sumber) {
+  const inpSum = document.getElementById('inputPersenSumatif');
+  const inpSas = document.getElementById('inputPersenSAS');
+  if (!inpSum || !inpSas) return;
+
+  let pSum = parseFloat(inpSum.value);
+  let pSas = parseFloat(inpSas.value);
+
+  if (sumber === 'sumatif') {
+    if (isNaN(pSum)) pSum = 0;
+    pSum = Math.max(0, Math.min(100, pSum));
+    pSas = 100 - pSum;
+    inpSas.value = pSas;
+  } else {
+    if (isNaN(pSas)) pSas = 0;
+    pSas = Math.max(0, Math.min(100, pSas));
+    pSum = 100 - pSas;
+    inpSum.value = pSum;
+  }
+
+  state.bobotSumatif = pSum;
+  state.bobotSAS = pSas;
+  saveLocalCache();
+  perbaruiTeksRumusAktif();
+
+  document.querySelectorAll('#tbodyNilai tr[data-row-nisn]').forEach(tr => {
+    hitungBarisNilai(tr.dataset.rowNisn);
+  });
+}
+
 // ================= TAB 1: INPUT & PENGOLAHAN NILAI GURU =================
 function tambahKolomTP() {
   if (state.jumlahTP < 10) {
@@ -548,6 +646,7 @@ function renderTabelNilai() {
   const kelas = selKelas.options[selKelas.selectedIndex]?.value || selKelas.value;
 
   updateDropdownMapelUntukKelas(kelas);
+  pastikanPanelBobotPersentase();
 
   const selMapel = document.getElementById('filterMapelNilai');
   const kodeMapel = selMapel.value;
@@ -576,8 +675,8 @@ function renderTabelNilai() {
       <th class="sticky-col-no p-2.5 text-center border-r border-b border-slate-300">No</th>
       <th class="sticky-col-nama p-2.5 text-left border-r border-b border-slate-300">Nama Siswa</th>
       ${tpHeaders}
-      <th class="p-2.5 text-center border-r border-b border-slate-300 bg-blue-50 text-blue-900 min-w-[88px] w-[88px]">Rata-Rata<br>Sumatif</th>
-      <th class="p-2.5 text-center border-r border-b border-slate-300 bg-amber-50 text-amber-900 min-w-[96px] w-[96px]">Sumatif Akhir<br>Semester (SAS)</th>
+      <th class="p-2.5 text-center border-r border-b border-slate-300 bg-blue-50 text-blue-900 min-w-[88px] w-[88px]">Rata-Rata<br>Sumatif (${state.bobotSumatif}%)</th>
+      <th class="p-2.5 text-center border-r border-b border-slate-300 bg-amber-50 text-amber-900 min-w-[96px] w-[96px]">Sumatif Akhir<br>Semester (${state.bobotSAS}%)</th>
       <th class="p-2.5 text-center border-r border-b border-slate-300 bg-emerald-50 text-emerald-900 min-w-[104px] w-[104px]">Nilai Rapor</th>
       <th class="col-capaian p-2.5 text-left border-b border-slate-300">Capaian Kompetensi</th>
     </tr>
@@ -612,7 +711,7 @@ function renderTabelNilai() {
       `;
     }
 
-    const calc = Utils.hitungAngkaRapor(tpArr, sasVal);
+    const calc = Utils.hitungAngkaRapor(tpArr, sasVal, state.bobotSumatif, state.bobotSAS);
     const capaianText = saved.capaian_kompetensi || (calc.bulat > 0 ? Utils.generateCapaianOtomatis(namaMapel, calc.bulat) : '');
 
     return `
@@ -650,7 +749,7 @@ function hitungBarisNilai(nisn) {
   const tpVals = Array.from(tpInputs).map(inp => inp.value);
   const sasVal = document.getElementById(`sas-${nisn}`).value;
 
-  const calc = Utils.hitungAngkaRapor(tpVals, sasVal);
+  const calc = Utils.hitungAngkaRapor(tpVals, sasVal, state.bobotSumatif, state.bobotSAS);
   document.getElementById(`rata-${nisn}`).textContent = calc.rataStr;
   document.getElementById(`rapor-${nisn}`).textContent = calc.raporStr;
 
@@ -722,7 +821,7 @@ async function simpanNilaiMapelKeServer() {
     const sasNum = sasRaw === '' ? 0 : parseFloat(sasRaw);
     const capaian = document.getElementById(`capaian-${nisn}`).value.trim();
 
-    const calc = Utils.hitungAngkaRapor(tpArr, sasRaw);
+    const calc = Utils.hitungAngkaRapor(tpArr, sasRaw, state.bobotSumatif, state.bobotSAS);
     const key = `${tahun}|${semester}|${kelas}|${nisn}|${kodeMapel}`;
 
     const record = {
@@ -752,7 +851,7 @@ async function simpanNilaiMapelKeServer() {
   try {
     const { error } = await DBService.upsertRaporNilai(payload);
     if (error) throw error;
-    Utils.showToast(`Tersimpan ${payload.length} nilai ${namaMapel} untuk kelas ${kelas} ke Server.`);
+    Utils.showToast(`Tersimpan ${payload.length} nilai ${namaMapel} (${state.bobotSumatif}% Sumatif : ${state.bobotSAS}% SAS) ke Server.`);
   } catch (err) {
     console.error('Gagal simpan nilai ke server:', err);
     Utils.showToast(`Gagal kirim ke server (${err.message || 'cek tabel rapor_nilai'}), data disimpan lokal.`, true);
