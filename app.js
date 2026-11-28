@@ -34,7 +34,7 @@ function normNISN(val) {
 async function syncAllFromServer(notify = false) {
   const statusEl = document.getElementById('serverConnStatus');
   if (statusEl) {
-    statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Menghubungkan ke Server...`;
+    statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0"></span> Menghubungkan ke Server...`;
   }
   try {
     const src = await DBService.fetchAllSourceTables();
@@ -85,7 +85,7 @@ async function syncAllFromServer(notify = false) {
 
     saveLocalCache();
     if (statusEl) {
-      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Terhubung (${state.siswa.length} siswa, ${state.raporNilaiList.length} data nilai)`;
+      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span> Terhubung (${state.siswa.length} siswa, ${state.raporNilaiList.length} data nilai)`;
     }
     if (notify) Utils.showToast(`Tersinkron: ${state.siswa.length} siswa & ${state.raporNilaiList.length} baris nilai dari Server.`);
     if (state.user) {
@@ -97,7 +97,7 @@ async function syncAllFromServer(notify = false) {
     loadLocalCache();
     const errMsg = err?.message || 'Gagal memuat data server';
     if (statusEl) {
-      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span> Offline: ${errMsg}`;
+      statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span> Offline: ${errMsg}`;
     }
     if (notify) Utils.showToast(`Offline: ${errMsg}`, true);
   }
@@ -216,7 +216,7 @@ function setupLoginHandlers() {
       hint.innerHTML = 'Gunakan Nomor HP yang telah ditetapkan Admin sebagai Wali Kelas (sandi <b>123456</b>).';
     } else {
       label.textContent = 'Nomor HP Guru';
-      input.placeholder = 'Username / Nomor HP Guru';
+      input.placeholder = 'Nomor HP Guru (cth: 085298875399)';
       hint.innerHTML = 'Gunakan Nomor HP terdaftar di tabel guru dengan sandi default <b>123456</b>.';
     }
   });
@@ -540,25 +540,25 @@ function pastikanPanelBobotPersentase() {
   if (!document.getElementById('panelBobotPersentase')) {
     const bar = document.createElement('div');
     bar.id = 'panelBobotPersentase';
-    bar.className = 'mt-2 flex flex-wrap items-center gap-3 bg-blue-50/80 border border-blue-200 rounded-lg px-3 py-2 text-xs';
+    bar.className = 'mt-1.5 flex flex-wrap items-center gap-2.5 bg-blue-50/80 border border-blue-200 rounded-lg px-2.5 py-1.5 text-xs';
     bar.innerHTML = `
-      <span class="font-bold text-blue-900">Bobot Nilai Rapor:</span>
-      <label class="flex items-center gap-1.5 text-slate-700 font-medium">
-        <span>Rata-Rata Sumatif:</span>
+      <span class="font-bold text-blue-900">Bobot:</span>
+      <label class="flex items-center gap-1 text-slate-700 font-medium">
+        <span>Sumatif:</span>
         <input type="number" id="inputPersenSumatif" min="0" max="100" step="1" value="${state.bobotSumatif}"
           oninput="ubahBobotPersentase('sumatif')"
-          class="w-14 text-center border border-blue-300 bg-white rounded px-1.5 py-0.5 font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+          class="w-12 text-center border border-blue-300 bg-white rounded px-1 py-0.5 font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
         <span>%</span>
       </label>
-      <label class="flex items-center gap-1.5 text-slate-700 font-medium">
-        <span>Sumatif Akhir (SAS):</span>
+      <label class="flex items-center gap-1 text-slate-700 font-medium">
+        <span>SAS:</span>
         <input type="number" id="inputPersenSAS" min="0" max="100" step="1" value="${state.bobotSAS}"
           oninput="ubahBobotPersentase('sas')"
-          class="w-14 text-center border border-amber-300 bg-white rounded px-1.5 py-0.5 font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+          class="w-12 text-center border border-amber-300 bg-white rounded px-1 py-0.5 font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none" />
         <span>%</span>
       </label>
       <span id="infoRumusPersentase" class="text-[11px] text-slate-600">
-        Rumus aktif: <b>(${state.bobotSumatif}% × Rata-Rata Sumatif) + (${state.bobotSAS}% × SAS)</b>
+        Rumus: <b>(${state.bobotSumatif}% × Sumatif) + (${state.bobotSAS}% × SAS)</b>
       </span>
     `;
     if (parentHeader) {
@@ -577,7 +577,7 @@ function perbaruiTeksRumusAktif() {
   const teks = `Rumus Nilai Rapor: (${state.bobotSumatif}% × Rata-Rata Sumatif) + (${state.bobotSAS}% × SAS) (Pembulatan Matematika)`;
   const infoEl = document.getElementById('infoRumusPersentase');
   if (infoEl) {
-    infoEl.innerHTML = `Rumus aktif: <b>(${state.bobotSumatif}% × Rata-Rata Sumatif) + (${state.bobotSAS}% × SAS)</b>`;
+    infoEl.innerHTML = `Rumus: <b>(${state.bobotSumatif}% × Sumatif) + (${state.bobotSAS}% × SAS)</b>`;
   }
   const rumusLamaEl = document.getElementById('rumusAktifTeks');
   if (rumusLamaEl) {
@@ -664,7 +664,7 @@ function renderTabelNilai() {
   const kodeMapel = selMapel.value;
   const namaMapel = bersihkanNamaMapel(selMapel.options[selMapel.selectedIndex]?.text || kodeMapel);
 
-  document.getElementById('judulTabelNilai').textContent = `Pengolahan Nilai: ${namaMapel} — Kelas ${kelas || '-'}`;
+  document.getElementById('judulTabelNilai').textContent = `Nilai: ${namaMapel} (${kelas || '-'})`;
 
   const siswaKelas = state.siswa
     .filter(s => normStr(Utils.getSiswaKelas(s)) === normStr(kelas))
@@ -679,18 +679,18 @@ function renderTabelNilai() {
 
   let tpHeaders = '';
   for (let i = 1; i <= state.jumlahTP; i++) {
-    tpHeaders += `<th class="p-2.5 text-center border-r border-b border-slate-300 min-w-[78px] w-[78px]">Sumatif ${i}<br><span class="text-[10px] font-normal text-slate-500">(TP ${i})</span></th>`;
+    tpHeaders += `<th class="p-2 text-center border-r border-b border-slate-300 min-w-[70px]">TP ${i}</th>`;
   }
 
   document.getElementById('theadNilai').innerHTML = `
     <tr>
-      <th class="sticky-col-no p-2.5 text-center border-r border-b border-slate-300">No</th>
-      <th class="sticky-col-nama p-2.5 text-left border-r border-b border-slate-300">Nama Siswa</th>
+      <th class="sticky-col-no p-2 text-center border-r border-b border-slate-300">No</th>
+      <th class="sticky-col-nama p-2 text-left border-r border-b border-slate-300">Nama Siswa</th>
       ${tpHeaders}
-      <th class="p-2.5 text-center border-r border-b border-slate-300 bg-blue-50 text-blue-900 min-w-[88px] w-[88px]">Rata-Rata<br>Sumatif (${state.bobotSumatif}%)</th>
-      <th class="p-2.5 text-center border-r border-b border-slate-300 bg-amber-50 text-amber-900 min-w-[96px] w-[96px]">Sumatif Akhir<br>Semester (${state.bobotSAS}%)</th>
-      <th class="p-2.5 text-center border-r border-b border-slate-300 bg-emerald-50 text-emerald-900 min-w-[104px] w-[104px]">Nilai Rapor</th>
-      <th class="col-capaian p-2.5 text-left border-b border-slate-300">Capaian Kompetensi</th>
+      <th class="p-2 text-center border-r border-b border-slate-300 bg-blue-50 text-blue-900 min-w-[76px]">Rata TP<br><span class="text-[10px] font-normal">(${state.bobotSumatif}%)</span></th>
+      <th class="p-2 text-center border-r border-b border-slate-300 bg-amber-50 text-amber-900 min-w-[78px]">SAS<br><span class="text-[10px] font-normal">(${state.bobotSAS}%)</span></th>
+      <th class="p-2 text-center border-r border-b border-slate-300 bg-emerald-50 text-emerald-900 min-w-[88px]">Rapor</th>
+      <th class="col-capaian p-2 text-left border-b border-slate-300">Capaian Kompetensi</th>
     </tr>
   `;
 
@@ -714,11 +714,11 @@ function renderTabelNilai() {
     for (let t = 0; t < state.jumlahTP; t++) {
       const val = tpArr[t] !== undefined && tpArr[t] !== null ? tpArr[t] : '';
       tpInputs += `
-        <td class="p-1.5 text-center border-r border-b border-slate-200">
-          <input type="number" min="0" max="100" step="0.1" value="${val}"
+        <td class="p-1 text-center border-r border-b border-slate-200">
+          <input type="number" inputmode="decimal" min="0" max="100" step="0.1" value="${val}"
             data-nisn="${nisn}" data-tp="${t}"
             oninput="hitungBarisNilai('${nisn}')"
-            class="inp-tp-${nisn} w-16 text-center border border-slate-300 rounded px-1.5 py-1 text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            class="inp-nilai-cell inp-tp-${nisn} border border-slate-300 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
         </td>
       `;
     }
@@ -728,26 +728,26 @@ function renderTabelNilai() {
 
     return `
       <tr class="hover:bg-slate-50" data-row-nisn="${nisn}" data-row-nama="${nama}">
-        <td class="sticky-col-no p-2 text-center border-r border-b border-slate-200 text-slate-500">${idx + 1}</td>
-        <td class="sticky-col-nama p-2 border-r border-b border-slate-200 font-semibold text-slate-800">
-          <div class="truncate" title="${nama}">${nama}</div>
-          <div class="text-[10px] font-normal text-slate-400">NISN: ${nisn}</div>
+        <td class="sticky-col-no p-1.5 text-center border-r border-b border-slate-200 text-slate-500">${idx + 1}</td>
+        <td class="sticky-col-nama p-1.5 border-r border-b border-slate-200 font-semibold text-slate-800">
+          <div class="truncate text-[11px] sm:text-xs" title="${nama}">${nama}</div>
+          <div class="text-[10px] font-normal text-slate-400 truncate">${nisn}</div>
         </td>
         ${tpInputs}
-        <td class="p-2 text-center border-r border-b border-slate-200 bg-blue-50/40 font-semibold text-blue-900" id="rata-${nisn}">
+        <td class="p-1.5 text-center border-r border-b border-slate-200 bg-blue-50/40 font-semibold text-blue-900" id="rata-${nisn}">
           ${calc.rataStr}
         </td>
-        <td class="p-1.5 text-center border-r border-b border-slate-200 bg-amber-50/40">
-          <input type="number" min="0" max="100" step="0.1" value="${sasVal}"
+        <td class="p-1 text-center border-r border-b border-slate-200 bg-amber-50/40">
+          <input type="number" inputmode="decimal" min="0" max="100" step="0.1" value="${sasVal}"
             id="sas-${nisn}" oninput="hitungBarisNilai('${nisn}')"
-            class="w-16 text-center border border-amber-300 bg-white rounded px-1.5 py-1 text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+            class="inp-nilai-cell border border-amber-300 bg-white font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none" />
         </td>
-        <td class="p-2 text-center border-r border-b border-slate-200 bg-emerald-50/40 font-bold text-emerald-900" id="rapor-${nisn}">
+        <td class="p-1.5 text-center border-r border-b border-slate-200 bg-emerald-50/40 font-bold text-emerald-900" id="rapor-${nisn}">
           ${calc.raporStr}
         </td>
-        <td class="col-capaian p-1.5 border-b border-slate-200">
+        <td class="col-capaian p-1 border-b border-slate-200">
           <textarea rows="2" id="capaian-${nisn}"
-            class="textarea-capaian border border-slate-300 rounded px-2.5 py-1.5 text-[11px] focus:ring-2 focus:ring-blue-500 focus:outline-none">${capaianText}</textarea>
+            class="textarea-capaian border border-slate-300 rounded-lg px-2 py-1 text-[11px] focus:ring-2 focus:ring-blue-500 focus:outline-none">${capaianText}</textarea>
         </td>
       </tr>
     `;
@@ -981,13 +981,13 @@ function renderRekapWaliKelas() {
   document.getElementById('theadRekap').innerHTML = `
     <tr>
       <th class="p-2.5 text-center border-r border-slate-300 w-10">No</th>
-      <th class="p-2.5 text-left border-r border-slate-300 min-w-[180px]">Nama Peserta Didik</th>
+      <th class="p-2.5 text-left border-r border-slate-300 min-w-[160px]">Nama Peserta Didik</th>
       ${mapelSusunan.map((m, idx) => `
-        <th class="p-2 text-center border-r border-slate-300 min-w-[90px]" title="${m.nama_mapel_cetak}">
+        <th class="p-2 text-center border-r border-slate-300 min-w-[85px]" title="${m.nama_mapel_cetak}">
           ${idx + 1}. ${m.nama_mapel_cetak}
         </th>
       `).join('')}
-      <th class="p-2.5 text-center bg-blue-50 text-blue-900 min-w-[85px]">Rata-Rata</th>
+      <th class="p-2.5 text-center bg-blue-50 text-blue-900 min-w-[80px]">Rata-Rata</th>
     </tr>
   `;
 
@@ -1278,7 +1278,7 @@ function renderPreviewRapor() {
   }
 
   if (typeof RaporPrinter === 'undefined' || typeof RaporPrinter.buildRaporDuaHalamanHTML !== 'function') {
-    container.innerHTML = `<div class="bg-amber-50 border border-amber-300 text-amber-800 p-6 rounded-xl text-center text-xs font-medium">Modul cetak <b>rapor-print.js</b> belum dimuat oleh browser. Pastikan file <b>rapor-print.js</b> berada satu folder dengan <b>index.html</b> lalu tekan <b>Ctrl + Shift + R</b>.</div>`;
+    container.innerHTML = `<div class="bg-amber-50 border border-amber-300 text-amber-800 p-6 rounded-xl text-center text-xs font-medium">Modul cetak <b>print_rapor.js</b> belum dimuat oleh browser. Pastikan file <b>print_rapor.js</b> berada satu folder dengan <b>index.html</b> lalu tekan <b>Ctrl + Shift + R</b>.</div>`;
     return;
   }
 
@@ -1292,7 +1292,7 @@ function cetakSatuSiswa() {
 
 function cetakSemuaSatuKelas() {
   if (typeof RaporPrinter === 'undefined' || typeof RaporPrinter.buildRaporDuaHalamanHTML !== 'function') {
-    Utils.showToast('File rapor-print.js belum dimuat. Tekan Ctrl + Shift + R.', true);
+    Utils.showToast('File print_rapor.js belum dimuat. Tekan Ctrl + Shift + R.', true);
     return;
   }
 
