@@ -187,6 +187,18 @@ function getFilteredMapelForKelas(kelas) {
 }
 
 // ================= AUTENTIKASI 3 PERAN =================
+function toggleLoginPasswordVisibility() {
+  const passInput = document.getElementById('loginPassword');
+  const toggleBtn = document.getElementById('togglePasswordBtn');
+  if (!passInput) return;
+
+  const isPassword = passInput.type === 'password';
+  passInput.type = isPassword ? 'text' : 'password';
+  if (toggleBtn) {
+    toggleBtn.textContent = isPassword ? '🙈' : '👁️';
+  }
+}
+
 function setupLoginHandlers() {
   document.getElementById('loginRole').addEventListener('change', (e) => {
     const role = e.target.value;
@@ -196,15 +208,15 @@ function setupLoginHandlers() {
 
     if (role === 'ADMIN') {
       label.textContent = 'Username Admin';
-      input.placeholder = 'Masukkan username admin';
+      input.placeholder = 'Username Admin';
       hint.innerHTML = 'Menggunakan kredensial dari tabel <b>admin</b> di Server.';
     } else if (role === 'WALI_KELAS') {
       label.textContent = 'Nomor HP Wali Kelas';
-      input.placeholder = 'Contoh: 085298875399';
+      input.placeholder = 'Nomor HP Wali Kelas (cth: 085298875399)';
       hint.innerHTML = 'Gunakan Nomor HP yang telah ditetapkan Admin sebagai Wali Kelas (sandi <b>123456</b>).';
     } else {
       label.textContent = 'Nomor HP Guru';
-      input.placeholder = 'Contoh: 085298875399';
+      input.placeholder = 'Username / Nomor HP Guru';
       hint.innerHTML = 'Gunakan Nomor HP terdaftar di tabel guru dengan sandi default <b>123456</b>.';
     }
   });
@@ -879,7 +891,6 @@ function getMapelSusunanByKelas(kelas) {
     }
   }
 
-  // Gabungkan otomatis mapel yang sudah ada nilainya di server untuk kelas ini meskipun belum ditambahkan Admin ke setting
   const hasil = [...dasar];
   const kelasNorm = normStr(kelas);
   const existingNames = new Set(hasil.map(m => normStr(bersihkanNamaMapel(m.nama_mapel_cetak))));
