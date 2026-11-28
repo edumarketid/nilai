@@ -1,10 +1,44 @@
 /* style.css - Styling Aplikasi E-Rapor & Layout Cetak Kertas F4 (215mm x 330mm) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 body {
   font-family: 'Inter', sans-serif;
   background-color: #f1f5f9;
   color: #1e293b;
+}
+
+/* ================= TAMPILAN HALAMAN LOGIN SPLIT LAYOUT ================= */
+.login-hero-bg {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(56, 189, 248, 0.32) 0%, transparent 38%),
+    radial-gradient(circle at 82% 20%, rgba(37, 99, 235, 0.22) 0%, transparent 45%),
+    linear-gradient(135deg, #e0f2fe 0%, #eff6ff 48%, #dbeafe 100%);
+}
+
+.login-wave-left {
+  position: fixed;
+  left: -120px;
+  bottom: -140px;
+  width: 680px;
+  height: 360px;
+  border-radius: 45% 55% 0 0;
+  background: linear-gradient(90deg, #0f172a 0%, #1d4ed8 65%, #0284c7 100%);
+  opacity: 0.16;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-wave-right {
+  position: fixed;
+  right: -180px;
+  top: -120px;
+  width: 560px;
+  height: 120%;
+  border-radius: 50% 0 0 50%;
+  background: linear-gradient(180deg, #0284c7 0%, #1d4ed8 55%, #1e3a8a 100%);
+  opacity: 0.22;
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* ================= PERBAIKAN TABEL INPUT NILAI RESPONSIF SAAT TAMBAH TP ================= */
