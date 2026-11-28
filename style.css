@@ -1,4 +1,4 @@
-/* style.css - Styling Aplikasi E-Rapor & Layout Cetak Kertas F4 (215mm x 330mm) */
+/* style.css - Styling Aplikasi E-Rapor (Mobile-First) & Layout Cetak Kertas F4 (215mm x 330mm) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 body {
@@ -7,44 +7,31 @@ body {
   color: #1e293b;
 }
 
-/* ================= TAMPILAN HALAMAN LOGIN SPLIT LAYOUT ================= */
+/* ================= LATAR BELAKANG HALAMAN LOGIN ================= */
 .login-hero-bg {
   background:
-    radial-gradient(circle at 12% 14%, rgba(56, 189, 248, 0.32) 0%, transparent 38%),
-    radial-gradient(circle at 82% 20%, rgba(37, 99, 235, 0.22) 0%, transparent 45%),
-    linear-gradient(135deg, #e0f2fe 0%, #eff6ff 48%, #dbeafe 100%);
-}
-
-.login-wave-left {
-  position: fixed;
-  left: -120px;
-  bottom: -140px;
-  width: 680px;
-  height: 360px;
-  border-radius: 45% 55% 0 0;
-  background: linear-gradient(90deg, #0f172a 0%, #1d4ed8 65%, #0284c7 100%);
-  opacity: 0.16;
-  pointer-events: none;
-  z-index: 0;
+    radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.28) 0%, transparent 42%),
+    linear-gradient(155deg, #e0f2fe 0%, #eff6ff 52%, #dbeafe 100%);
 }
 
 .login-wave-right {
   position: fixed;
   right: -180px;
-  top: -120px;
-  width: 560px;
+  top: -100px;
+  width: 520px;
   height: 120%;
   border-radius: 50% 0 0 50%;
   background: linear-gradient(180deg, #0284c7 0%, #1d4ed8 55%, #1e3a8a 100%);
-  opacity: 0.22;
+  opacity: 0.2;
   pointer-events: none;
   z-index: 0;
 }
 
-/* ================= PERBAIKAN TABEL INPUT NILAI RESPONSIF SAAT TAMBAH TP ================= */
+/* ================= TABEL INPUT NILAI MOBILE-FIRST ================= */
 .table-nilai-wrapper {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   position: relative;
   border-top: 1px solid #e2e8f0;
 }
@@ -56,26 +43,26 @@ body {
   border-spacing: 0;
 }
 
-/* Sticky kolom No dan Nama Siswa agar tidak hilang saat scroll horizontal TP */
+/* Kolom No & Nama Siswa tetap menempel saat digeser di layar HP */
 .sticky-col-no {
   position: sticky;
   left: 0;
   z-index: 15;
   background-color: #f8fafc;
-  width: 42px;
-  min-width: 42px;
-  max-width: 42px;
+  width: 34px;
+  min-width: 34px;
+  max-width: 34px;
 }
 
 .sticky-col-nama {
   position: sticky;
-  left: 42px;
+  left: 34px;
   z-index: 15;
   background-color: #ffffff;
-  width: 210px;
-  min-width: 210px;
-  max-width: 210px;
-  box-shadow: 2px 0 5px -2px rgba(15, 23, 42, 0.08);
+  width: 132px;
+  min-width: 132px;
+  max-width: 132px;
+  box-shadow: 2px 0 6px -2px rgba(15, 23, 42, 0.12);
 }
 
 thead .sticky-col-no,
@@ -89,20 +76,59 @@ tbody tr:hover .sticky-col-no {
   background-color: #f8fafc;
 }
 
-/* Kolom Capaian Kompetensi selalu lebar & terbaca penuh meski TP bertambah banyak */
+/* Input angka nyaman disentuh di layar HP tanpa memicu zoom berlebihan */
+.inp-nilai-cell {
+  width: 58px;
+  min-height: 36px;
+  text-align: center;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Kolom Capaian Kompetensi mudah dibaca & diketik di HP maupun laptop */
 .col-capaian {
-  min-width: 320px;
-  width: 340px;
+  min-width: 240px;
+  width: 280px;
 }
 
 .textarea-capaian {
   width: 100%;
-  min-width: 300px;
-  min-height: 58px;
+  min-width: 224px;
+  min-height: 56px;
   resize: vertical;
   white-space: normal;
   word-wrap: break-word;
   line-height: 1.38;
+}
+
+@media (min-width: 640px) {
+  .sticky-col-no {
+    width: 42px;
+    min-width: 42px;
+    max-width: 42px;
+  }
+
+  .sticky-col-nama {
+    left: 42px;
+    width: 210px;
+    min-width: 210px;
+    max-width: 210px;
+  }
+
+  .inp-nilai-cell {
+    width: 66px;
+    font-size: 12px;
+  }
+
+  .col-capaian {
+    min-width: 320px;
+    width: 340px;
+  }
+
+  .textarea-capaian {
+    min-width: 300px;
+  }
 }
 
 /* ================= STYLING KHUSUS CETAK RAPOR KERTAS F4 (215mm x 330mm) ================= */
